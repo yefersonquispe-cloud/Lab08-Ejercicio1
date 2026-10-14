@@ -20,9 +20,30 @@ interface TaskDao {
     @Query("SELECT * FROM tasks")
     suspend fun getAllTasks(): List<Task>
 
+    @Query("SELECT * FROM tasks")
+    fun observeTasks(): kotlinx.coroutines.flow.Flow<List<Task>>
+
+    @Query("SELECT * FROM tasks WHERE id = :id")
+    suspend fun getTask(id: Int): Task?
+
+    @Query("UPDATE tasks SET reminded_at = :delivered WHERE id = :id AND reminder_at = :expected AND is_completed = 0")
+    suspend fun markReminded(id: Int, expected: Long, delivered: Long)
+
+    @Query("UPDATE tasks SET description = :title, notes = :notes WHERE id = :id")
+    suspend fun editText(id: Int, title: String, notes: String)
+
+    @Query("UPDATE tasks SET is_starred = NOT is_starred WHERE id = :id")
+    suspend fun toggleStar(id: Int)
+
+    @Query("UPDATE tasks SET is_completed = NOT is_completed WHERE id = :id")
+    suspend fun toggleCompletion(id: Int)
+
+    @Query("UPDATE tasks SET reminder_at = :date, reminded_at = NULL, due_at = CASE WHEN :date IS NULL THEN due_at ELSE :date END WHERE id = :id")
+    suspend fun setReminderDate(id: Int, date: Long?)
+
     // Insertar una nueva tarea
     @Insert
-    suspend fun insertTask(task: Task)
+    suspend fun insertTask(task: Task): Long
 
     // Marcar una tarea como completada o no completada
     @Update

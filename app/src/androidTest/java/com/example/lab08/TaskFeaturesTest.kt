@@ -1,5 +1,11 @@
 package com.example.lab08
 
+import android.Manifest
+import android.app.NotificationManager
+import android.os.Build
+import androidx.lifecycle.ViewModelProvider
+import androidx.work.WorkManager
+import androidx.work.WorkInfo
 import android.database.sqlite.SQLiteDatabase
 import java.util.Calendar
 import androidx.compose.ui.test.*
@@ -22,6 +28,7 @@ class TaskFeaturesTest {
         val db = TaskDatabase.getInstance(context)
         for (task in db.taskDao().getAllTasks()) {
             if (created[task.id] == task.description) {
+                TaskReminderScheduler(context).cancel(task.id)
                 db.openHelper.writableDatabase.execSQL("DELETE FROM tasks WHERE id = ?", arrayOf(task.id))
             }
         }
@@ -172,6 +179,11 @@ class TaskFeaturesTest {
         rule.onNodeWithTag("search").performTextReplacement("EXAMEN")
         rule.onNodeWithText("Preparar examen").assertIsDisplayed()
         rule.onNodeWithText("Comprar pan").assertIsDisplayed()
+        rule.onNodeWithContentDescription("Completar Comprar pan").performClick()
+        rule.onNodeWithText("Pendientes").performClick()
+        rule.onNodeWithText("Comprar pan").assertDoesNotExist()
+        rule.onNodeWithText("Preparar examen").assertIsDisplayed()
+        rule.onNodeWithText("Todas").performClick()
         rule.onNodeWithTag("search").performTextReplacement("pan")
         rule.onNodeWithText("Preparar examen").assertDoesNotExist()
         rule.onNodeWithText("Comprar pan").assertIsDisplayed()
@@ -205,6 +217,77 @@ class TaskFeaturesTest {
         runBlocking { assertEquals(dates, TaskDatabase.getInstance(context).taskDao().getAllTasks()
             .filter { it.id in created }.associate { it.id to it.createdAt }) }
     }
+    private fun allowNotifications() {
+        if (Build.VERSION.SDK_INT >= 33) InstrumentationRegistry.getInstrumentation().uiAutomation
+            .grantRuntimePermission(context.packageName, Manifest.permission.POST_NOTIFICATIONS)
+    }
+    @Test fun reminderConfigurationPersistsAndCanBeRemoved() {
+        allowNotifications()
+        add("Recordar estudiar"); recordTask("Recordar estudiar")
+        rule.onNodeWithText("Recordar estudiar").performClick()
+        rule.onNodeWithText("Recordatorio").performClick()
+        rule.onNodeWithText("Fecha").performClick()
+        rule.onNodeWithText("Aceptar fecha").performClick()
+        rule.onNodeWithText("Hora").performClick()
+        rule.onNodeWithText("Aceptar hora").performClick()
+        rule.onNodeWithText("En 1 minuto").performClick()
+        rule.onNodeWithText("Guardar recordatorio").performClick()
+        rule.waitUntil(5000) { rule.onAllNodesWithText("Recordatorio activo").fetchSemanticsNodes().isNotEmpty() }
+        val task = runBlocking { TaskDatabase.getInstance(context).taskDao().getAllTasks().single { it.id in created } }
+        assertTrue(task.reminderAt!! > System.currentTimeMillis())
+        rule.activityRule.scenario.recreate()
+        rule.waitUntil(5000) { rule.onAllNodesWithText("Recordatorio activo").fetchSemanticsNodes().isNotEmpty() }
+        rule.onNodeWithText("Recordar estudiar").performClick()
+        rule.onNodeWithText("Recordatorio").performClick()
+        rule.onNodeWithText("Quitar recordatorio").performClick()
+        rule.waitUntil(5000) { runBlocking { TaskDatabase.getInstance(context).taskDao().getTask(task.id)?.reminderAt == null } }
+        rule.waitUntil(5000) { WorkManager.getInstance(context).getWorkInfosForUniqueWork("task-reminder-${task.id}")
+            .get().all { it.state == WorkInfo.State.CANCELLED } }
+    }
+    @Test fun completedAndDeletedTasksCancelFutureReminders() {
+        allowNotifications()
+        add("Aviso pendiente cancelado"); recordTask("Aviso pendiente cancelado")
+        add("Aviso eliminado"); recordTask("Aviso eliminado")
+        val saved = runBlocking { TaskDatabase.getInstance(context).taskDao().getAllTasks().filter { it.id in created } }
+        rule.runOnIdle {
+            val model = ViewModelProvider(rule.activity)[TaskViewModel::class.java]
+            saved.forEach { model.setReminder(it, System.currentTimeMillis() + 10_000) }
+        }
+        rule.waitUntil(5000) { runBlocking { TaskDatabase.getInstance(context).taskDao().getAllTasks()
+            .filter { it.id in created }.all { it.reminderAt != null } } }
+        rule.onNodeWithContentDescription("Completar Aviso pendiente cancelado").performClick()
+        rule.onNodeWithText("Aviso eliminado").performClick()
+        rule.onNodeWithText("Eliminar tarea").performClick()
+        rule.onNodeWithText("Eliminar").performClick()
+        rule.waitUntil(5000) { saved.all { task -> WorkManager.getInstance(context)
+            .getWorkInfosForUniqueWork("task-reminder-${task.id}").get().all { it.state == WorkInfo.State.CANCELLED } } }
+        val completed = runBlocking { TaskDatabase.getInstance(context).taskDao().getTask(saved.single { it.description == "Aviso pendiente cancelado" }.id) }
+        assertTrue(completed!!.isCompleted); assertNull(completed.remindedAt)
+        assertNull(runBlocking { TaskDatabase.getInstance(context).taskDao().getTask(saved.single { it.description == "Aviso eliminado" }.id) })
+        assertTrue(context.getSystemService(NotificationManager::class.java).activeNotifications.none { it.id in created })
+    }
+    @Test fun scheduledReminderDeliversAndCompletionCancels() {
+        allowNotifications()
+        add("Aviso real del laboratorio"); recordTask("Aviso real del laboratorio")
+        val task = runBlocking { TaskDatabase.getInstance(context).taskDao().getAllTasks().single { it.id in created } }
+        rule.runOnIdle {
+            ViewModelProvider(rule.activity)[TaskViewModel::class.java].setReminder(task, System.currentTimeMillis() + 3000)
+        }
+        val notifications = context.getSystemService(NotificationManager::class.java)
+        rule.waitUntil(30000) { notifications.activeNotifications.any { it.id == task.id } }
+        assertEquals("Aviso real del laboratorio", notifications.activeNotifications.single { it.id == task.id }
+            .notification.extras.getString(android.app.Notification.EXTRA_TITLE))
+        rule.waitUntil(5000) { runBlocking { TaskDatabase.getInstance(context).taskDao().getTask(task.id)?.remindedAt != null } }
+        rule.onNodeWithText("Aviso real del laboratorio").performClick()
+        rule.onNodeWithTag("editNotes").performTextReplacement("Aviso recibido")
+        rule.onNodeWithText("Guardar cambios").performClick()
+        rule.waitForIdle()
+        assertNotNull(runBlocking { TaskDatabase.getInstance(context).taskDao().getTask(task.id)?.remindedAt })
+        rule.onNodeWithContentDescription("Completar Aviso real del laboratorio").performClick()
+        rule.waitUntil(5000) { notifications.activeNotifications.none { it.id == task.id } }
+        rule.waitUntil(5000) { WorkManager.getInstance(context).getWorkInfosForUniqueWork("task-reminder-${task.id}")
+            .get().all { it.state.isFinished } }
+    }
     @Test fun migrationPreservesExistingTasks() {
         val name = "migration-design-test.db"
         context.deleteDatabase(name)
@@ -214,12 +297,12 @@ class TaskFeaturesTest {
             db.version = 1
         }
         val migrated = Room.databaseBuilder(context, TaskDatabase::class.java, name)
-            .addMigrations(TaskDatabase.MIGRATION_1_2, TaskDatabase.MIGRATION_2_3, TaskDatabase.MIGRATION_3_4).build()
+            .addMigrations(TaskDatabase.MIGRATION_1_2, TaskDatabase.MIGRATION_2_3, TaskDatabase.MIGRATION_3_4, TaskDatabase.MIGRATION_4_5).build()
         runBlocking {
             val task = migrated.taskDao().getAllTasks().single()
             assertEquals(7, task.id); assertEquals("Tarea anterior", task.description)
             assertTrue(task.isCompleted); assertFalse(task.isStarred)
-            assertEquals("Mis tareas", task.listName); assertEquals("", task.notes); assertNull(task.dueAt); assertNull(task.createdAt)
+            assertEquals("Mis tareas", task.listName); assertEquals("", task.notes); assertNull(task.dueAt); assertNull(task.createdAt); assertNull(task.reminderAt); assertNull(task.remindedAt)
             assertTrue(migrated.taskDao().getLists().any { it.name == "Mis tareas" })
         }
         migrated.close()

@@ -14,5 +14,7 @@ data class Task(
     @ColumnInfo(defaultValue = "''") val notes: String = "",
     @ColumnInfo(name = "due_at") val dueAt: Long? = null,
     // Las tareas antiguas conservan fecha desconocida; las nuevas usan la creación real.
-    @ColumnInfo(name = "created_at") val createdAt: Long? = System.currentTimeMillis()
+    @ColumnInfo(name = "created_at") val createdAt: Long? = System.currentTimeMillis(),
+    @ColumnInfo(name = "reminder_at") val reminderAt: Long? = null,
+    @ColumnInfo(name = "reminded_at") val remindedAt: Long? = null
 )

@@ -59,18 +59,18 @@ class MainActivity : ComponentActivity() {
         val db = TaskDatabase.getInstance(applicationContext)
         val model = ViewModelProvider(this, object : ViewModelProvider.Factory {
             @Suppress("UNCHECKED_CAST")
-            override fun <T : ViewModel> create(modelClass: Class<T>): T = TaskViewModel(db.taskDao()) as T
+            override fun <T : ViewModel> create(modelClass: Class<T>): T = TaskViewModel(db.taskDao(), TaskReminderScheduler(applicationContext)) as T
         })[TaskViewModel::class.java]
-        setContent { Lab08Theme(darkTheme = true, dynamicColor = false) { TaskScreen(model) } }
+        setContent { Lab08Theme(darkTheme = true, dynamicColor = false) { TaskScreen(model, intent.getStringExtra("list_name") ?: "Mis tareas") } }
     }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun TaskScreen(viewModel: TaskViewModel) {
+fun TaskScreen(viewModel: TaskViewModel, initialList: String = "Mis tareas") {
     val tasks by viewModel.tasks.collectAsState()
     val lists by viewModel.lists.collectAsState()
-    var selectedList by rememberSaveable { mutableStateOf("Mis tareas") }
+    var selectedList by rememberSaveable { mutableStateOf(initialList) }
     var favorites by rememberSaveable { mutableStateOf(false) }
     var addingTask by rememberSaveable { mutableStateOf(false) }
     var newTaskDescription by rememberSaveable { mutableStateOf("") }
@@ -88,6 +88,7 @@ fun TaskScreen(viewModel: TaskViewModel) {
     var newListName by rememberSaveable { mutableStateOf("") }
     var showMenu by remember { mutableStateOf(false) }
     var taskToDelete by remember { mutableStateOf<Task?>(null) }
+    var reminderTask by remember { mutableStateOf<Task?>(null) }
     var editingTask by remember { mutableStateOf<Task?>(null) }
     var confirmClear by remember { mutableStateOf(false) }
     var filter by rememberSaveable { mutableStateOf(TaskFilter.ALL) }
@@ -197,6 +198,8 @@ fun TaskScreen(viewModel: TaskViewModel) {
                                     textDecoration = if (task.isCompleted) TextDecoration.LineThrough else TextDecoration.None)
                                 if (task.notes.isNotBlank()) Text(task.notes, fontSize = 13.sp,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                if (task.reminderAt != null) Text(if (task.remindedAt == null) "Recordatorio activo" else "Recordatorio enviado",
+                                    fontSize = 12.sp, color = MaterialTheme.colorScheme.primary)
                                 task.dueAt?.let { Text(DateFormat.getDateTimeInstance(DateFormat.SHORT, DateFormat.SHORT).format(it),
                                     fontSize = 12.sp, color = MaterialTheme.colorScheme.primary) }
                             }
@@ -289,6 +292,9 @@ fun TaskScreen(viewModel: TaskViewModel) {
                     modifier = Modifier.testTag("editTitle"))
                 OutlinedTextField(value = notes, onValueChange = { notes = it }, label = { Text("Descripción") },
                     modifier = Modifier.testTag("editNotes"))
+                TextButton(enabled = !task.isCompleted, onClick = { reminderTask = task; editingTask = null }) {
+                    Text("Recordatorio")
+                }
                 TextButton(onClick = { taskToDelete = task; editingTask = null }) {
                     Text("Eliminar tarea", color = MaterialTheme.colorScheme.error)
                 }
@@ -296,6 +302,11 @@ fun TaskScreen(viewModel: TaskViewModel) {
                 viewModel.editTask(task, title, notes); editingTask = null
             }) { Text("Guardar cambios") } },
             dismissButton = { TextButton(onClick = { editingTask = null }) { Text("Cancelar") } })
+    }
+    reminderTask?.let { task ->
+        TaskReminderDialog(task, onDismiss = { reminderTask = null }, onSave = { date ->
+            viewModel.setReminder(task, date); reminderTask = null
+        })
     }
     taskToDelete?.let { task ->
         AlertDialog(onDismissRequest = { taskToDelete = null }, title = { Text("¿Eliminar esta tarea?") },

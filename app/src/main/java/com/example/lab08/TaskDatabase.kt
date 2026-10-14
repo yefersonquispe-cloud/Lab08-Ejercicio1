@@ -7,7 +7,7 @@ import androidx.room.RoomDatabase
 import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 
-@Database(entities = [Task::class, TaskList::class], version = 4)
+@Database(entities = [Task::class, TaskList::class], version = 5)
 abstract class TaskDatabase : RoomDatabase() {
     abstract fun taskDao(): TaskDao
 
@@ -32,9 +32,15 @@ abstract class TaskDatabase : RoomDatabase() {
                 db.execSQL("ALTER TABLE tasks ADD COLUMN created_at INTEGER")
             }
         }
+        val MIGRATION_4_5 = object : Migration(4, 5) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE tasks ADD COLUMN reminder_at INTEGER")
+                db.execSQL("ALTER TABLE tasks ADD COLUMN reminded_at INTEGER")
+            }
+        }
         fun getInstance(context: Context): TaskDatabase = instance ?: synchronized(this) {
             instance ?: Room.databaseBuilder(context.applicationContext, TaskDatabase::class.java, "task_db")
-                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4).build().also { instance = it }
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5).build().also { instance = it }
         }
     }
 }
