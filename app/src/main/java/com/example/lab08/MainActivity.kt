@@ -90,7 +90,8 @@ fun TaskScreen(viewModel: TaskViewModel) {
     var taskToDelete by remember { mutableStateOf<Task?>(null) }
     var editingTask by remember { mutableStateOf<Task?>(null) }
     var confirmClear by remember { mutableStateOf(false) }
-    val visibleTasks = tasks.filter { if (favorites) it.isStarred else it.listName == selectedList }
+    var filter by rememberSaveable { mutableStateOf(TaskFilter.ALL) }
+    val visibleTasks = filterTasks(tasks, selectedList, favorites, filter)
     val listTitle = if (favorites) "Destacadas" else selectedList
     Scaffold(containerColor = MaterialTheme.colorScheme.background,
         floatingActionButton = {
@@ -117,6 +118,12 @@ fun TaskScreen(viewModel: TaskViewModel) {
                 item { ListTab("+  Nueva lista", false, "Crear nueva lista") { addingList = true } }
             }
             HorizontalDivider(color = Color(0xFF3C4045))
+            LazyRow(contentPadding = PaddingValues(horizontal = 16.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                items(TaskFilter.entries) { option ->
+                    FilterChip(selected = filter == option, onClick = { filter = option }, label = { Text(option.label) })
+                }
+            }
             LazyColumn(Modifier.fillMaxWidth().weight(1f).testTag("taskList"),
                 contentPadding = PaddingValues(start = 8.dp, end = 8.dp, top = 8.dp, bottom = 92.dp)) {
                 item {
@@ -145,7 +152,8 @@ fun TaskScreen(viewModel: TaskViewModel) {
                             horizontalAlignment = Alignment.CenterHorizontally) {
                             EmptyTasksIllustration(Modifier.fillMaxWidth().height(180.dp))
                             Spacer(Modifier.height(28.dp))
-                            Text(if (favorites) "No hay tareas destacadas" else "No hay tareas aún",
+                            Text(if (filter != TaskFilter.ALL) "No hay tareas para este filtro"
+                                else if (favorites) "No hay tareas destacadas" else "No hay tareas aún",
                                 fontSize = 21.sp, textAlign = TextAlign.Center)
                             Spacer(Modifier.height(12.dp))
                             Text(if (favorites) "Toca la estrella de una tarea para verla aquí."

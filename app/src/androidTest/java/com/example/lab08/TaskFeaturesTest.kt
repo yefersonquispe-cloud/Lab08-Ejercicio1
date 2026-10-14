@@ -145,6 +145,20 @@ class TaskFeaturesTest {
             assertFalse(tasks.any { it.description == "Eliminar esta tarea" })
         }
     }
+    @Test fun filtersShowCorrectStates() {
+        add("Estudiar pendiente"); recordTask("Estudiar pendiente")
+        add("Desayuno completado"); recordTask("Desayuno completado")
+        rule.onNodeWithContentDescription("Completar Desayuno completado").performClick()
+        rule.onNodeWithText("Pendientes").performClick()
+        rule.onNodeWithText("Estudiar pendiente").assertIsDisplayed()
+        rule.onNodeWithText("Desayuno completado").assertDoesNotExist()
+        rule.onNodeWithText("Completadas").performClick()
+        rule.onNodeWithText("Desayuno completado").assertIsDisplayed()
+        rule.onNodeWithText("Estudiar pendiente").assertDoesNotExist()
+        rule.onNodeWithText("Todas").performClick()
+        rule.onNodeWithText("Estudiar pendiente").assertIsDisplayed()
+        rule.onNodeWithText("Desayuno completado").assertIsDisplayed()
+    }
     @Test fun migrationPreservesExistingTasks() {
         val name = "migration-design-test.db"
         context.deleteDatabase(name)
