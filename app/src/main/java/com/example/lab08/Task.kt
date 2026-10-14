@@ -16,5 +16,6 @@ data class Task(
     // Las tareas antiguas conservan fecha desconocida; las nuevas usan la creación real.
     @ColumnInfo(name = "created_at") val createdAt: Long? = System.currentTimeMillis(),
     @ColumnInfo(name = "reminder_at") val reminderAt: Long? = null,
-    @ColumnInfo(name = "reminded_at") val remindedAt: Long? = null
+    @ColumnInfo(name = "reminded_at") val remindedAt: Long? = null,
+    @ColumnInfo(defaultValue = "'Media'") val priority: String = "Media"
 )

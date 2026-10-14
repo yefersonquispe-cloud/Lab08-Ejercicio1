@@ -75,6 +75,7 @@ fun TaskScreen(viewModel: TaskViewModel, initialList: String = "Mis tareas") {
     var addingTask by rememberSaveable { mutableStateOf(false) }
     var newTaskDescription by rememberSaveable { mutableStateOf("") }
     var newTaskNotes by rememberSaveable { mutableStateOf("") }
+    var newTaskPriority by rememberSaveable { mutableStateOf("Media") }
     var newTaskStar by rememberSaveable { mutableStateOf(false) }
     var newTaskDueAt by rememberSaveable { mutableStateOf<Long?>(null) }
     var showNotes by rememberSaveable { mutableStateOf(false) }
@@ -196,6 +197,8 @@ fun TaskScreen(viewModel: TaskViewModel, initialList: String = "Mis tareas") {
                                 Text(task.description, fontSize = 17.sp,
                                     color = if (task.isCompleted) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface,
                                     textDecoration = if (task.isCompleted) TextDecoration.LineThrough else TextDecoration.None)
+                                Text("Prioridad ${task.priority}", fontSize = 12.sp,
+                                    modifier = Modifier.testTag("priority_${task.id}"), color = priorityColor(task.priority))
                                 if (task.notes.isNotBlank()) Text(task.notes, fontSize = 13.sp,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant)
                                 if (task.reminderAt != null) Text(if (task.remindedAt == null) "Recordatorio activo" else "Recordatorio enviado",
@@ -238,6 +241,7 @@ fun TaskScreen(viewModel: TaskViewModel, initialList: String = "Mis tareas") {
                         if (newTaskNotes.isEmpty()) Text("Agregar detalles", color = MaterialTheme.colorScheme.onSurfaceVariant)
                         field()
                     })
+                PrioritySelector(newTaskPriority) { newTaskPriority = it }
                 newTaskDueAt?.let { TextButton(onClick = { choosingDate = true }) {
                     Text(DateFormat.getDateTimeInstance(DateFormat.SHORT, DateFormat.SHORT).format(it))
                 } }
@@ -255,9 +259,9 @@ fun TaskScreen(viewModel: TaskViewModel, initialList: String = "Mis tareas") {
                         color = if (newTaskStar) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant) }
                     Spacer(Modifier.weight(1f))
                     TextButton(onClick = {
-                        viewModel.addTask(newTaskDescription, selectedList, newTaskNotes, newTaskDueAt, newTaskStar)
+                        viewModel.addTask(newTaskDescription, selectedList, newTaskNotes, newTaskDueAt, newTaskStar, newTaskPriority)
                         newTaskDescription = ""; newTaskNotes = ""; newTaskDueAt = null
-                        newTaskStar = false; showNotes = false; addingTask = false; favorites = false
+                        newTaskStar = false; newTaskPriority = "Media"; showNotes = false; addingTask = false; favorites = false
                     }, enabled = newTaskDescription.isNotBlank()) { Text("Guardar") }
                 }
             }
@@ -285,6 +289,7 @@ fun TaskScreen(viewModel: TaskViewModel, initialList: String = "Mis tareas") {
         }) { Text("Aceptar") } }, dismissButton = { TextButton(onClick = { choosingTime = false }) { Text("Cancelar") } })
     editingTask?.let { task ->
         var title by remember(task.id) { mutableStateOf(task.description) }
+        var priority by remember(task.id) { mutableStateOf(task.priority) }
         var notes by remember(task.id) { mutableStateOf(task.notes) }
         AlertDialog(onDismissRequest = { editingTask = null }, title = { Text("Editar tarea") },
             text = { Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -292,6 +297,7 @@ fun TaskScreen(viewModel: TaskViewModel, initialList: String = "Mis tareas") {
                     modifier = Modifier.testTag("editTitle"))
                 OutlinedTextField(value = notes, onValueChange = { notes = it }, label = { Text("Descripción") },
                     modifier = Modifier.testTag("editNotes"))
+                PrioritySelector(priority) { priority = it }
                 TextButton(enabled = !task.isCompleted, onClick = { reminderTask = task; editingTask = null }) {
                     Text("Recordatorio")
                 }
@@ -299,7 +305,7 @@ fun TaskScreen(viewModel: TaskViewModel, initialList: String = "Mis tareas") {
                     Text("Eliminar tarea", color = MaterialTheme.colorScheme.error)
                 }
             } }, confirmButton = { TextButton(enabled = title.isNotBlank(), onClick = {
-                viewModel.editTask(task, title, notes); editingTask = null
+                viewModel.editTask(task, title, notes, priority); editingTask = null
             }) { Text("Guardar cambios") } },
             dismissButton = { TextButton(onClick = { editingTask = null }) { Text("Cancelar") } })
     }

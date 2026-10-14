@@ -11,7 +11,9 @@ Aplicación Android en Kotlin, Jetpack Compose, Room y ViewModel. Interfaz oscur
 5. **Ordenar:** pulsa ↕. Nombre: A–Z; fecha de creación: más recientes primero; estado: pendientes primero. Las tareas antiguas mantienen fecha desconocida y aparecen al final al ordenar por fecha. Las nuevas registran su creación real.
 6. **Notificaciones:** toca una tarea pendiente → «Recordatorio». Configura «Fecha» y «Hora» o «En 1 minuto», luego «Guardar recordatorio». Puedes quitar el recordatorio desde ese mismo diálogo. Completar o eliminar una tarea cancela su recordatorio y su notificación.
 
-Se conservan las funciones de crear tareas, marcar completadas, destacar tareas y organizar listas. No se agregaron prioridades ni tareas recurrentes.
+Se conservan las funciones de crear tareas, marcar completadas, destacar tareas y organizar listas.
+
+7. **Prioridades:** selecciona Alta, Media o Baja al crear o editar la tarea. El valor se conserva y aparece con un color y texto en la lista.
 
 ## Recordatorios y permisos
 
@@ -30,7 +32,7 @@ Abre la carpeta del proyecto en Android Studio y sincroniza Gradle. Usa el JDK i
 ./gradlew assembleDebug
 ```
 
-Room incluye migraciones 1 → 2 → 3 → 4 → 5 y esquemas versionados. No se borra la base de datos para actualizarla.
+Room incluye migraciones 1 → 2 → 3 → 4 → 5 → 6 y esquemas versionados. No se borra la base de datos para actualizarla.
 
 ## Pruebas
 

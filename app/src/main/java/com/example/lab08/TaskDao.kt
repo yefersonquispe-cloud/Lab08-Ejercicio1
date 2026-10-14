@@ -29,8 +29,8 @@ interface TaskDao {
     @Query("UPDATE tasks SET reminded_at = :delivered WHERE id = :id AND reminder_at = :expected AND is_completed = 0")
     suspend fun markReminded(id: Int, expected: Long, delivered: Long)
 
-    @Query("UPDATE tasks SET description = :title, notes = :notes WHERE id = :id")
-    suspend fun editText(id: Int, title: String, notes: String)
+    @Query("UPDATE tasks SET description = :title, notes = :notes, priority = :priority WHERE id = :id")
+    suspend fun editText(id: Int, title: String, notes: String, priority: String)
 
     @Query("UPDATE tasks SET is_starred = NOT is_starred WHERE id = :id")
     suspend fun toggleStar(id: Int)

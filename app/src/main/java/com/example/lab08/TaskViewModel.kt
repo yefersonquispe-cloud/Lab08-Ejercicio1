@@ -42,20 +42,20 @@ class TaskViewModel(private val dao: TaskDao, private val reminders: TaskReminde
 
     // Función para añadir una nueva tarea
     fun addTask(description: String, listName: String = "Mis tareas", notes: String = "",
-                dueAt: Long? = null, starred: Boolean = false) {
+                dueAt: Long? = null, starred: Boolean = false, priority: String = "Media") {
         if (description.isBlank()) return
         val newTask = Task(description = description.trim(), listName = listName, notes = notes.trim(),
-            dueAt = dueAt, isStarred = starred)
+            dueAt = dueAt, isStarred = starred, priority = priority)
         viewModelScope.launch {
             val id = dao.insertTask(newTask).toInt()
             reminders.sync(newTask.copy(id = id))
         }
     }
 
-    fun editTask(task: Task, title: String, notes: String) {
+    fun editTask(task: Task, title: String, notes: String, priority: String = task.priority) {
         if (title.isBlank()) return
         viewModelScope.launch {
-            dao.editText(task.id, title.trim(), notes.trim())
+            dao.editText(task.id, title.trim(), notes.trim(), priority)
         }
     }
 

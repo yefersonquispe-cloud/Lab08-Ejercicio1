@@ -288,6 +288,22 @@ class TaskFeaturesTest {
         rule.waitUntil(5000) { WorkManager.getInstance(context).getWorkInfosForUniqueWork("task-reminder-${task.id}")
             .get().all { it.state.isFinished } }
     }
+    @Test fun prioritiesPersistWhenCreatedAndEdited() {
+        rule.onNodeWithContentDescription("Agregar tarea").performClick()
+        rule.onNodeWithTag("newTaskTitle").performTextReplacement("Tarea prioritaria")
+        rule.onNodeWithText("Alta").performClick()
+        rule.onNodeWithText("Guardar").performClick()
+        rule.waitUntil(5000) { rule.onAllNodesWithText("Tarea prioritaria").fetchSemanticsNodes().isNotEmpty() }
+        recordTask("Tarea prioritaria")
+        rule.onNodeWithText("Prioridad Alta").assertExists()
+        rule.onNodeWithText("Tarea prioritaria").performClick()
+        rule.onNodeWithText("Baja").performClick()
+        rule.onNodeWithText("Guardar cambios").performClick()
+        rule.waitUntil(5000) { rule.onAllNodesWithText("Prioridad Baja").fetchSemanticsNodes().isNotEmpty() }
+        rule.activityRule.scenario.recreate()
+        rule.waitUntil(5000) { rule.onAllNodesWithText("Prioridad Baja").fetchSemanticsNodes().isNotEmpty() }
+        assertEquals("Baja", runBlocking { TaskDatabase.getInstance(context).taskDao().getAllTasks().single { it.id in created }.priority })
+    }
     @Test fun migrationPreservesExistingTasks() {
         val name = "migration-design-test.db"
         context.deleteDatabase(name)
@@ -297,12 +313,12 @@ class TaskFeaturesTest {
             db.version = 1
         }
         val migrated = Room.databaseBuilder(context, TaskDatabase::class.java, name)
-            .addMigrations(TaskDatabase.MIGRATION_1_2, TaskDatabase.MIGRATION_2_3, TaskDatabase.MIGRATION_3_4, TaskDatabase.MIGRATION_4_5).build()
+            .addMigrations(TaskDatabase.MIGRATION_1_2, TaskDatabase.MIGRATION_2_3, TaskDatabase.MIGRATION_3_4, TaskDatabase.MIGRATION_4_5, TaskDatabase.MIGRATION_5_6).build()
         runBlocking {
             val task = migrated.taskDao().getAllTasks().single()
             assertEquals(7, task.id); assertEquals("Tarea anterior", task.description)
             assertTrue(task.isCompleted); assertFalse(task.isStarred)
-            assertEquals("Mis tareas", task.listName); assertEquals("", task.notes); assertNull(task.dueAt); assertNull(task.createdAt); assertNull(task.reminderAt); assertNull(task.remindedAt)
+            assertEquals("Mis tareas", task.listName); assertEquals("", task.notes); assertNull(task.dueAt); assertNull(task.createdAt); assertNull(task.reminderAt); assertNull(task.remindedAt); assertEquals("Media", task.priority)
             assertTrue(migrated.taskDao().getLists().any { it.name == "Mis tareas" })
         }
         migrated.close()
