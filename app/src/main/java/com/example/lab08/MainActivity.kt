@@ -87,6 +87,7 @@ fun TaskScreen(viewModel: TaskViewModel) {
     var addingList by rememberSaveable { mutableStateOf(false) }
     var newListName by rememberSaveable { mutableStateOf("") }
     var showMenu by remember { mutableStateOf(false) }
+    var taskToDelete by remember { mutableStateOf<Task?>(null) }
     var editingTask by remember { mutableStateOf<Task?>(null) }
     var confirmClear by remember { mutableStateOf(false) }
     val visibleTasks = tasks.filter { if (favorites) it.isStarred else it.listName == selectedList }
@@ -259,10 +260,19 @@ fun TaskScreen(viewModel: TaskViewModel) {
                     modifier = Modifier.testTag("editTitle"))
                 OutlinedTextField(value = notes, onValueChange = { notes = it }, label = { Text("Descripción") },
                     modifier = Modifier.testTag("editNotes"))
+                TextButton(onClick = { taskToDelete = task; editingTask = null }) {
+                    Text("Eliminar tarea", color = MaterialTheme.colorScheme.error)
+                }
             } }, confirmButton = { TextButton(enabled = title.isNotBlank(), onClick = {
                 viewModel.editTask(task, title, notes); editingTask = null
             }) { Text("Guardar cambios") } },
             dismissButton = { TextButton(onClick = { editingTask = null }) { Text("Cancelar") } })
+    }
+    taskToDelete?.let { task ->
+        AlertDialog(onDismissRequest = { taskToDelete = null }, title = { Text("¿Eliminar esta tarea?") },
+            text = { Text(task.description) },
+            confirmButton = { TextButton(onClick = { viewModel.deleteTask(task); taskToDelete = null }) { Text("Eliminar") } },
+            dismissButton = { TextButton(onClick = { taskToDelete = null }) { Text("Cancelar") } })
     }
     if (addingList) AlertDialog(onDismissRequest = { addingList = false }, title = { Text("Nueva lista") },
         text = { OutlinedTextField(value = newListName, onValueChange = { newListName = it },

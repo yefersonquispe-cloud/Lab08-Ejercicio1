@@ -125,6 +125,26 @@ class TaskFeaturesTest {
             assertEquals("Antes de estudiar", saved.notes)
         }
     }
+    @Test fun deleteOneTaskKeepsOthers() {
+        add("Eliminar esta tarea"); recordTask("Eliminar esta tarea")
+        add("Conservar esta tarea"); recordTask("Conservar esta tarea")
+        rule.onNodeWithText("Eliminar esta tarea").performClick()
+        rule.onNodeWithText("Eliminar tarea").performClick()
+        rule.onNodeWithText("Cancelar").performClick()
+        rule.onNodeWithText("Eliminar esta tarea").assertExists()
+        rule.onNodeWithText("Eliminar esta tarea").performClick()
+        rule.onNodeWithText("Eliminar tarea").performClick()
+        rule.onNodeWithText("Eliminar").performClick()
+        rule.waitUntil(5000) { rule.onAllNodesWithText("Eliminar esta tarea").fetchSemanticsNodes().isEmpty() }
+        rule.activityRule.scenario.recreate()
+        rule.waitUntil(5000) { rule.onAllNodesWithText("Conservar esta tarea").fetchSemanticsNodes().isNotEmpty() }
+        rule.onNodeWithText("Eliminar esta tarea").assertDoesNotExist()
+        runBlocking {
+            val tasks = TaskDatabase.getInstance(context).taskDao().getAllTasks()
+            assertTrue(tasks.any { it.description == "Conservar esta tarea" })
+            assertFalse(tasks.any { it.description == "Eliminar esta tarea" })
+        }
+    }
     @Test fun migrationPreservesExistingTasks() {
         val name = "migration-design-test.db"
         context.deleteDatabase(name)
