@@ -12,5 +12,7 @@ data class Task(
     @ColumnInfo(name = "is_starred", defaultValue = "0") val isStarred: Boolean = false,
     @ColumnInfo(name = "list_name", defaultValue = "'Mis tareas'") val listName: String = "Mis tareas",
     @ColumnInfo(defaultValue = "''") val notes: String = "",
-    @ColumnInfo(name = "due_at") val dueAt: Long? = null
+    @ColumnInfo(name = "due_at") val dueAt: Long? = null,
+    // Las tareas antiguas conservan fecha desconocida; las nuevas usan la creación real.
+    @ColumnInfo(name = "created_at") val createdAt: Long? = System.currentTimeMillis()
 )

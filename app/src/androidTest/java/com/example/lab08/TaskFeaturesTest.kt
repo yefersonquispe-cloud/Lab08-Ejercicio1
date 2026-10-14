@@ -180,6 +180,31 @@ class TaskFeaturesTest {
         rule.onNodeWithText("Limpiar").performClick()
         rule.onNodeWithText("Preparar examen").assertIsDisplayed()
     }
+    @Test fun sortingOrdersRowsAndPreservesCreationDate() {
+        val before = System.currentTimeMillis()
+        add("Zeta tarea"); recordTask("Zeta tarea")
+        add("Alfa tarea"); recordTask("Alfa tarea")
+        rule.onNodeWithContentDescription("Completar Alfa tarea").performClick()
+        fun choose(label: String) {
+            rule.onNodeWithContentDescription("Ordenar tareas").performClick()
+            rule.onNodeWithText(label).performClick()
+        }
+        fun assertAbove(first: String, second: String) {
+            assertTrue(rule.onNodeWithText(first).fetchSemanticsNode().boundsInRoot.top <
+                rule.onNodeWithText(second).fetchSemanticsNode().boundsInRoot.top)
+        }
+        choose("Nombre"); assertAbove("Alfa tarea", "Zeta tarea")
+        choose("Fecha de creación"); assertAbove("Alfa tarea", "Zeta tarea")
+        choose("Estado"); assertAbove("Zeta tarea", "Alfa tarea")
+        val dates = runBlocking { TaskDatabase.getInstance(context).taskDao().getAllTasks()
+            .filter { it.id in created }.associate { it.id to it.createdAt } }
+        assertTrue(dates.values.all { it != null && it >= before && it <= System.currentTimeMillis() })
+        rule.activityRule.scenario.recreate()
+        rule.waitUntil(5000) { rule.onAllNodesWithText("Alfa tarea").fetchSemanticsNodes().isNotEmpty() }
+        assertAbove("Zeta tarea", "Alfa tarea")
+        runBlocking { assertEquals(dates, TaskDatabase.getInstance(context).taskDao().getAllTasks()
+            .filter { it.id in created }.associate { it.id to it.createdAt }) }
+    }
     @Test fun migrationPreservesExistingTasks() {
         val name = "migration-design-test.db"
         context.deleteDatabase(name)
@@ -189,12 +214,12 @@ class TaskFeaturesTest {
             db.version = 1
         }
         val migrated = Room.databaseBuilder(context, TaskDatabase::class.java, name)
-            .addMigrations(TaskDatabase.MIGRATION_1_2, TaskDatabase.MIGRATION_2_3).build()
+            .addMigrations(TaskDatabase.MIGRATION_1_2, TaskDatabase.MIGRATION_2_3, TaskDatabase.MIGRATION_3_4).build()
         runBlocking {
             val task = migrated.taskDao().getAllTasks().single()
             assertEquals(7, task.id); assertEquals("Tarea anterior", task.description)
             assertTrue(task.isCompleted); assertFalse(task.isStarred)
-            assertEquals("Mis tareas", task.listName); assertEquals("", task.notes); assertNull(task.dueAt)
+            assertEquals("Mis tareas", task.listName); assertEquals("", task.notes); assertNull(task.dueAt); assertNull(task.createdAt)
             assertTrue(migrated.taskDao().getLists().any { it.name == "Mis tareas" })
         }
         migrated.close()

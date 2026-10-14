@@ -15,3 +15,15 @@ fun filterTasks(tasks: List<Task>, listName: String, starredOnly: Boolean, filte
                 TaskFilter.COMPLETED -> task.isCompleted
             }
     }
+
+
+enum class TaskSort(val label: String) {
+    NAME("Nombre"), CREATED("Fecha de creación"), STATE("Estado")
+}
+
+fun sortTasks(tasks: List<Task>, sort: TaskSort): List<Task> = when (sort) {
+    TaskSort.NAME -> tasks.sortedWith(compareBy<Task> { it.description.lowercase(java.util.Locale.ROOT) }.thenBy { it.id })
+    // Más recientes primero; fechas desconocidas al final, sin inventar fechas.
+    TaskSort.CREATED -> tasks.sortedWith(compareByDescending<Task> { it.createdAt ?: Long.MIN_VALUE }.thenByDescending { it.id })
+    TaskSort.STATE -> tasks.sortedWith(compareBy<Task> { it.isCompleted }.thenBy { it.description.lowercase(java.util.Locale.ROOT) }.thenBy { it.id })
+}

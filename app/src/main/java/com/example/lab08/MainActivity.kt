@@ -92,7 +92,9 @@ fun TaskScreen(viewModel: TaskViewModel) {
     var confirmClear by remember { mutableStateOf(false) }
     var filter by rememberSaveable { mutableStateOf(TaskFilter.ALL) }
     var search by rememberSaveable { mutableStateOf("") }
-    val visibleTasks = filterTasks(tasks, selectedList, favorites, filter, search)
+    var sort by rememberSaveable { mutableStateOf(TaskSort.CREATED) }
+    var showSort by remember { mutableStateOf(false) }
+    val visibleTasks = sortTasks(filterTasks(tasks, selectedList, favorites, filter, search), sort)
     val listTitle = if (favorites) "Destacadas" else selectedList
     Scaffold(containerColor = MaterialTheme.colorScheme.background,
         floatingActionButton = {
@@ -140,6 +142,18 @@ fun TaskScreen(viewModel: TaskViewModel) {
                             verticalAlignment = Alignment.CenterVertically) {
                             Text(listTitle, Modifier.weight(1f), fontWeight = FontWeight.SemiBold, fontSize = 16.sp)
                             Box {
+                                IconButton(onClick = { showSort = true }, modifier = Modifier.semantics {
+                                    contentDescription = "Ordenar tareas"
+                                }) { Text("↕", fontSize = 25.sp) }
+                                DropdownMenu(expanded = showSort, onDismissRequest = { showSort = false }) {
+                                    TaskSort.entries.forEach { option ->
+                                        DropdownMenuItem(text = { Text(option.label) }, onClick = {
+                                            sort = option; showSort = false
+                                        })
+                                    }
+                                }
+                            }
+                            Box {
                                 IconButton(onClick = { showMenu = true }, modifier = Modifier.semantics {
                                     contentDescription = "Opciones de la lista"
                                 }) { Text("⋮", fontSize = 25.sp) }
@@ -174,7 +188,7 @@ fun TaskScreen(viewModel: TaskViewModel) {
                     Surface(color = MaterialTheme.colorScheme.surface,
                         shape = if (task.id == visibleTasks.last().id) RoundedCornerShape(bottomStart = 20.dp, bottomEnd = 20.dp)
                         else RoundedCornerShape(0.dp)) {
-                        Row(Modifier.fillMaxWidth().padding(start = 14.dp, end = 12.dp, bottom = 12.dp),
+                        Row(Modifier.fillMaxWidth().testTag("task_${task.id}").padding(start = 14.dp, end = 12.dp, bottom = 12.dp),
                             verticalAlignment = Alignment.CenterVertically) {
                             TaskCompletionButton(task) { viewModel.toggleTaskCompletion(task) }
                             Column(Modifier.weight(1f).clickable { editingTask = task }.padding(horizontal = 8.dp)) {
