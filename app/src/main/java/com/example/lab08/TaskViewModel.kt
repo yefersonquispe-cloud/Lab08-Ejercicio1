@@ -12,17 +12,40 @@ class TaskViewModel(private val dao: TaskDao) : ViewModel() {
     private val _tasks = MutableStateFlow<List<Task>>(emptyList())
     val tasks: StateFlow<List<Task>> = _tasks
 
-    init {
-        // Al inicializar, cargamos las tareas de la base de datos
+    private val _lists = MutableStateFlow<List<TaskList>>(listOf(TaskList("Mis tareas")))
+    val lists: StateFlow<List<TaskList>> = _lists
+
+    fun addList(name: String) {
+        if (name.isBlank()) return
         viewModelScope.launch {
+            dao.insertList(TaskList(name.trim()))
+            _lists.value = dao.getLists()
+        }
+    }
+
+    fun toggleTaskStar(task: Task) {
+        viewModelScope.launch {
+            dao.updateTask(task.copy(isStarred = !task.isStarred))
+            _tasks.value = dao.getAllTasks()
+        }
+    }
+
+    init {
+        // Al inicializar, cargamos las listas y las tareas guardadas.
+        viewModelScope.launch {
+            dao.insertList(TaskList("Mis tareas"))
+            _lists.value = dao.getLists()
             _tasks.value = dao.getAllTasks()
         }
     }
 
 
     // Función para añadir una nueva tarea
-    fun addTask(description: String) {
-        val newTask = Task(description = description)
+    fun addTask(description: String, listName: String = "Mis tareas", notes: String = "",
+                dueAt: Long? = null, starred: Boolean = false) {
+        if (description.isBlank()) return
+        val newTask = Task(description = description.trim(), listName = listName, notes = notes.trim(),
+            dueAt = dueAt, isStarred = starred)
         viewModelScope.launch {
             dao.insertTask(newTask)
             _tasks.value = dao.getAllTasks() // Recargamos la lista

@@ -66,3 +66,5 @@ dependencies {
     debugImplementation(libs.androidx.compose.ui.test.manifest)
     debugImplementation(libs.androidx.compose.ui.tooling)
 }
+// Esquemas versionados para comprobar migraciones sin perder datos.
+ksp { arg("room.schemaLocation", "$projectDir/schemas") }

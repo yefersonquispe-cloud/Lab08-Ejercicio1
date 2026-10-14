@@ -2,11 +2,18 @@ package com.example.lab08
 
 import androidx.room.Dao
 import androidx.room.Insert
+import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import androidx.room.Update
 
 @Dao
 interface TaskDao {
+
+    @Query("SELECT * FROM task_lists ORDER BY CASE WHEN name = 'Mis tareas' THEN 0 ELSE 1 END, name")
+    suspend fun getLists(): List<TaskList>
+
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
+    suspend fun insertList(list: TaskList)
 
     // Obtener todas las tareas
     @Query("SELECT * FROM tasks")
