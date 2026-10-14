@@ -91,7 +91,8 @@ fun TaskScreen(viewModel: TaskViewModel) {
     var editingTask by remember { mutableStateOf<Task?>(null) }
     var confirmClear by remember { mutableStateOf(false) }
     var filter by rememberSaveable { mutableStateOf(TaskFilter.ALL) }
-    val visibleTasks = filterTasks(tasks, selectedList, favorites, filter)
+    var search by rememberSaveable { mutableStateOf("") }
+    val visibleTasks = filterTasks(tasks, selectedList, favorites, filter, search)
     val listTitle = if (favorites) "Destacadas" else selectedList
     Scaffold(containerColor = MaterialTheme.colorScheme.background,
         floatingActionButton = {
@@ -118,6 +119,11 @@ fun TaskScreen(viewModel: TaskViewModel) {
                 item { ListTab("+  Nueva lista", false, "Crear nueva lista") { addingList = true } }
             }
             HorizontalDivider(color = Color(0xFF3C4045))
+            OutlinedTextField(value = search, onValueChange = { search = it },
+                placeholder = { Text("Buscar tareas") }, singleLine = true,
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp).testTag("search"),
+                shape = RoundedCornerShape(24.dp),
+                trailingIcon = { if (search.isNotEmpty()) TextButton(onClick = { search = "" }) { Text("Limpiar") } })
             LazyRow(contentPadding = PaddingValues(horizontal = 16.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 items(TaskFilter.entries) { option ->
@@ -152,7 +158,8 @@ fun TaskScreen(viewModel: TaskViewModel) {
                             horizontalAlignment = Alignment.CenterHorizontally) {
                             EmptyTasksIllustration(Modifier.fillMaxWidth().height(180.dp))
                             Spacer(Modifier.height(28.dp))
-                            Text(if (filter != TaskFilter.ALL) "No hay tareas para este filtro"
+                            Text(if (search.isNotBlank()) "Sin resultados"
+                                else if (filter != TaskFilter.ALL) "No hay tareas para este filtro"
                                 else if (favorites) "No hay tareas destacadas" else "No hay tareas aún",
                                 fontSize = 21.sp, textAlign = TextAlign.Center)
                             Spacer(Modifier.height(12.dp))
@@ -196,7 +203,7 @@ fun TaskScreen(viewModel: TaskViewModel) {
         ModalBottomSheet(onDismissRequest = { addingTask = false }, sheetState = sheetState, dragHandle = null,
             shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
             containerColor = MaterialTheme.colorScheme.background) {
-            Column(Modifier.fillMaxWidth().imePadding().padding(horizontal = 16.dp).padding(top = 22.dp, bottom = 12.dp)) {
+            Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp).padding(top = 22.dp, bottom = 12.dp)) {
                 BasicTextField(value = newTaskDescription, onValueChange = { newTaskDescription = it },
                     textStyle = MaterialTheme.typography.bodyLarge.copy(color = MaterialTheme.colorScheme.onSurface),
                     cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),

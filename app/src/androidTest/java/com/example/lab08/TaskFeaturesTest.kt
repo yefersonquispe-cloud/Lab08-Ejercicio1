@@ -35,6 +35,7 @@ class TaskFeaturesTest {
     private fun add(text: String) {
         rule.onNodeWithContentDescription("Agregar tarea").performClick()
         rule.onNodeWithTag("newTaskTitle").performTextReplacement(text)
+        rule.waitUntil(5000) { rule.onAllNodesWithText("Guardar").fetchSemanticsNodes().isNotEmpty() }
         rule.onNodeWithText("Guardar").performClick()
         rule.waitUntil(5000) { rule.onAllNodesWithText(text).fetchSemanticsNodes().isNotEmpty() }
     }
@@ -45,6 +46,7 @@ class TaskFeaturesTest {
         rule.onNodeWithTag("newTaskTitle").performTextReplacement("   ")
         rule.onNodeWithText("Guardar").assertIsNotEnabled()
         rule.onNodeWithTag("newTaskTitle").performTextReplacement(text)
+        rule.waitUntil(5000) { rule.onAllNodesWithText("Guardar").fetchSemanticsNodes().isNotEmpty() }
         rule.onNodeWithText("Guardar").performClick()
         rule.waitUntil(5000) { rule.onAllNodesWithText(text).fetchSemanticsNodes().isNotEmpty() }
         recordTask(text)
@@ -69,6 +71,7 @@ class TaskFeaturesTest {
         rule.onNodeWithContentDescription("Agregar detalles").performClick()
         rule.onNodeWithTag("newTaskNotes").performTextReplacement("Repasar Compose")
         rule.onNodeWithContentDescription("Destacar nueva tarea").performClick()
+        rule.waitUntil(5000) { rule.onAllNodesWithText("Guardar").fetchSemanticsNodes().isNotEmpty() }
         rule.onNodeWithText("Guardar").performClick()
         rule.waitUntil(5000) { rule.onAllNodesWithText(text).fetchSemanticsNodes().isNotEmpty() }
         recordTask(text)
@@ -96,6 +99,7 @@ class TaskFeaturesTest {
         rule.onNodeWithText("Elegir hora").assertIsEnabled()
         rule.onNodeWithText("Elegir hora").performClick()
         rule.onNodeWithText("Aceptar").performClick()
+        rule.waitUntil(5000) { rule.onAllNodesWithText("Guardar").fetchSemanticsNodes().isNotEmpty() }
         rule.onNodeWithText("Guardar").performClick()
         rule.waitUntil(5000) { rule.onAllNodesWithText(text).fetchSemanticsNodes().isNotEmpty() }
         recordTask(text)
@@ -158,6 +162,23 @@ class TaskFeaturesTest {
         rule.onNodeWithText("Todas").performClick()
         rule.onNodeWithText("Estudiar pendiente").assertIsDisplayed()
         rule.onNodeWithText("Desayuno completado").assertIsDisplayed()
+    }
+    @Test fun searchMatchesNameAndDescription() {
+        add("Preparar examen"); recordTask("Preparar examen")
+        add("Comprar pan"); recordTask("Comprar pan")
+        rule.onNodeWithText("Comprar pan").performClick()
+        rule.onNodeWithTag("editNotes").performTextReplacement("Examen de cocina")
+        rule.onNodeWithText("Guardar cambios").performClick()
+        rule.onNodeWithTag("search").performTextReplacement("EXAMEN")
+        rule.onNodeWithText("Preparar examen").assertIsDisplayed()
+        rule.onNodeWithText("Comprar pan").assertIsDisplayed()
+        rule.onNodeWithTag("search").performTextReplacement("pan")
+        rule.onNodeWithText("Preparar examen").assertDoesNotExist()
+        rule.onNodeWithText("Comprar pan").assertIsDisplayed()
+        rule.onNodeWithTag("search").performTextReplacement("no coincide")
+        rule.onNodeWithText("Sin resultados").assertExists()
+        rule.onNodeWithText("Limpiar").performClick()
+        rule.onNodeWithText("Preparar examen").assertIsDisplayed()
     }
     @Test fun migrationPreservesExistingTasks() {
         val name = "migration-design-test.db"
