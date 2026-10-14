@@ -1,8 +1,6 @@
 package com.example.lab08
 
 import android.database.sqlite.SQLiteDatabase
-import android.graphics.Bitmap
-import android.os.SystemClock
 import java.util.Calendar
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
@@ -15,7 +13,6 @@ import org.junit.Rule
 import org.junit.After
 import org.junit.Test
 import org.junit.runner.RunWith
-import java.io.File
 
 @RunWith(AndroidJUnit4::class)
 class TaskFeaturesTest {
@@ -35,15 +32,6 @@ class TaskFeaturesTest {
         created[task.id] = task.description
     }
     private val context get() = InstrumentationRegistry.getInstrumentation().targetContext
-    private fun screenshot(name: String) {
-        rule.waitForIdle()
-        SystemClock.sleep(700) // Esperar a que el fotograma y el teclado se dibujen.
-        InstrumentationRegistry.getInstrumentation().waitForIdleSync()
-        val image = InstrumentationRegistry.getInstrumentation().uiAutomation.takeScreenshot()
-        val dir = File(context.getExternalFilesDir(null), "evidence").apply { mkdirs() }
-        File(dir, name).outputStream().use { image.compress(Bitmap.CompressFormat.PNG, 100, it) }
-        image.recycle()
-    }
     private fun add(text: String) {
         rule.onNodeWithContentDescription("Agregar tarea").performClick()
         rule.onNodeWithTag("newTaskTitle").performTextReplacement(text)
@@ -52,17 +40,14 @@ class TaskFeaturesTest {
     }
     @Test fun designCreateCompleteAndReopen() {
         val text = "Ejercicios"
-        screenshot("01_diseno_principal.png")
         rule.onNodeWithContentDescription("Agregar tarea").performClick()
         rule.onNodeWithText("Guardar").assertIsNotEnabled()
         rule.onNodeWithTag("newTaskTitle").performTextReplacement("   ")
         rule.onNodeWithText("Guardar").assertIsNotEnabled()
         rule.onNodeWithTag("newTaskTitle").performTextReplacement(text)
-        screenshot("03_agregar_tarea.png")
         rule.onNodeWithText("Guardar").performClick()
         rule.waitUntil(5000) { rule.onAllNodesWithText(text).fetchSemanticsNodes().isNotEmpty() }
         recordTask(text)
-        screenshot("04_diseno_con_tarea.png")
         rule.onNodeWithContentDescription("Completar $text").performClick()
         rule.waitForIdle()
         recordTask(text)
@@ -73,7 +58,6 @@ class TaskFeaturesTest {
             val saved = TaskDatabase.getInstance(context).taskDao().getAllTasks().single { it.description == text }
             assertTrue(saved.isCompleted)
         }
-        screenshot("05_tarea_completada.png")
     }
     @Test fun listsStarsAndDetailsPersist() {
         val text = "Estudiar Kotlin"
@@ -102,7 +86,6 @@ class TaskFeaturesTest {
             assertEquals("Repasar Compose", saved.notes)
             assertTrue(dao.getLists().any { it.name == "Estudios" })
         }
-        screenshot("06_listas_destacadas.png")
     }
     @Test fun dateAndTimePersist() {
         val text = "Entrega de laboratorio"
@@ -124,7 +107,23 @@ class TaskFeaturesTest {
             val date = Calendar.getInstance().apply { timeInMillis = saved.dueAt!! }
             assertEquals(day.toInt(), date.get(Calendar.DAY_OF_MONTH))
         }
-        screenshot("07_fecha_guardada.png")
+    }
+    @Test fun editTaskPersists() {
+        add("Desayunar")
+        recordTask("Desayunar")
+        rule.onNodeWithText("Desayunar").performClick()
+        rule.onNodeWithTag("editTitle").performTextReplacement("Desayunar temprano")
+        rule.onNodeWithTag("editNotes").performTextReplacement("Antes de estudiar")
+        rule.onNodeWithText("Guardar cambios").performClick()
+        rule.waitUntil(5000) { rule.onAllNodesWithText("Desayunar temprano").fetchSemanticsNodes().isNotEmpty() }
+        recordTask("Desayunar temprano")
+        rule.activityRule.scenario.recreate()
+        rule.waitUntil(5000) { rule.onAllNodesWithText("Desayunar temprano").fetchSemanticsNodes().isNotEmpty() }
+        rule.onNodeWithText("Antes de estudiar").assertIsDisplayed()
+        runBlocking {
+            val saved = TaskDatabase.getInstance(context).taskDao().getAllTasks().single { it.description == "Desayunar temprano" }
+            assertEquals("Antes de estudiar", saved.notes)
+        }
     }
     @Test fun migrationPreservesExistingTasks() {
         val name = "migration-design-test.db"

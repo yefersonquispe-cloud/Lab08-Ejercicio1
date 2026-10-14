@@ -52,6 +52,14 @@ class TaskViewModel(private val dao: TaskDao) : ViewModel() {
         }
     }
 
+    fun editTask(task: Task, title: String, notes: String) {
+        if (title.isBlank()) return
+        viewModelScope.launch {
+            dao.updateTask(task.copy(description = title.trim(), notes = notes.trim()))
+            _tasks.value = dao.getAllTasks()
+        }
+    }
+
     // Función para alternar el estado de completado de una tarea
     fun toggleTaskCompletion(task: Task) {
         viewModelScope.launch {

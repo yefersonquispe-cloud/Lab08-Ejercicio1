@@ -87,6 +87,7 @@ fun TaskScreen(viewModel: TaskViewModel) {
     var addingList by rememberSaveable { mutableStateOf(false) }
     var newListName by rememberSaveable { mutableStateOf("") }
     var showMenu by remember { mutableStateOf(false) }
+    var editingTask by remember { mutableStateOf<Task?>(null) }
     var confirmClear by remember { mutableStateOf(false) }
     val visibleTasks = tasks.filter { if (favorites) it.isStarred else it.listName == selectedList }
     val listTitle = if (favorites) "Destacadas" else selectedList
@@ -160,7 +161,7 @@ fun TaskScreen(viewModel: TaskViewModel) {
                         Row(Modifier.fillMaxWidth().padding(start = 14.dp, end = 12.dp, bottom = 12.dp),
                             verticalAlignment = Alignment.CenterVertically) {
                             TaskCompletionButton(task) { viewModel.toggleTaskCompletion(task) }
-                            Column(Modifier.weight(1f).padding(horizontal = 8.dp)) {
+                            Column(Modifier.weight(1f).clickable { editingTask = task }.padding(horizontal = 8.dp)) {
                                 Text(task.description, fontSize = 17.sp,
                                     color = if (task.isCompleted) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface,
                                     textDecoration = if (task.isCompleted) TextDecoration.LineThrough else TextDecoration.None)
@@ -249,6 +250,20 @@ fun TaskScreen(viewModel: TaskViewModel) {
             }.timeInMillis
             choosingTime = false
         }) { Text("Aceptar") } }, dismissButton = { TextButton(onClick = { choosingTime = false }) { Text("Cancelar") } })
+    editingTask?.let { task ->
+        var title by remember(task.id) { mutableStateOf(task.description) }
+        var notes by remember(task.id) { mutableStateOf(task.notes) }
+        AlertDialog(onDismissRequest = { editingTask = null }, title = { Text("Editar tarea") },
+            text = { Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                OutlinedTextField(value = title, onValueChange = { title = it }, label = { Text("Nombre") },
+                    modifier = Modifier.testTag("editTitle"))
+                OutlinedTextField(value = notes, onValueChange = { notes = it }, label = { Text("Descripción") },
+                    modifier = Modifier.testTag("editNotes"))
+            } }, confirmButton = { TextButton(enabled = title.isNotBlank(), onClick = {
+                viewModel.editTask(task, title, notes); editingTask = null
+            }) { Text("Guardar cambios") } },
+            dismissButton = { TextButton(onClick = { editingTask = null }) { Text("Cancelar") } })
+    }
     if (addingList) AlertDialog(onDismissRequest = { addingList = false }, title = { Text("Nueva lista") },
         text = { OutlinedTextField(value = newListName, onValueChange = { newListName = it },
             label = { Text("Nombre de la lista") }, singleLine = true) },
