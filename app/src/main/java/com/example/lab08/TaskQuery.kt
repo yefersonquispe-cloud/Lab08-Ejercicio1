@@ -4,8 +4,9 @@ enum class TaskFilter(val label: String) {
     ALL("Todas"), PENDING("Pendientes"), COMPLETED("Completadas")
 }
 
-fun filterTasks(tasks: List<Task>, listName: String, starredOnly: Boolean, filter: TaskFilter, query: String = ""): List<Task> =
+fun filterTasks(tasks: List<Task>, listName: String, starredOnly: Boolean, filter: TaskFilter, query: String = "", category: String? = null): List<Task> =
     tasks.filter { task ->
+        (category == null || task.category == category) &&
         (query.isBlank() || task.description.contains(query.trim(), ignoreCase = true) ||
             task.notes.contains(query.trim(), ignoreCase = true)) &&
         (if (starredOnly) task.isStarred else task.listName == listName) &&

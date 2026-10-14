@@ -141,11 +141,11 @@ class TaskFeaturesTest {
         add("Eliminar esta tarea"); recordTask("Eliminar esta tarea")
         add("Conservar esta tarea"); recordTask("Conservar esta tarea")
         rule.onNodeWithText("Eliminar esta tarea").performClick()
-        rule.onNodeWithText("Eliminar tarea").performClick()
+        rule.onNodeWithText("Eliminar tarea").performScrollTo().performClick()
         rule.onNodeWithText("Cancelar").performClick()
         rule.onNodeWithText("Eliminar esta tarea").assertExists()
         rule.onNodeWithText("Eliminar esta tarea").performClick()
-        rule.onNodeWithText("Eliminar tarea").performClick()
+        rule.onNodeWithText("Eliminar tarea").performScrollTo().performClick()
         rule.onNodeWithText("Eliminar").performClick()
         rule.waitUntil(5000) { rule.onAllNodesWithText("Eliminar esta tarea").fetchSemanticsNodes().isEmpty() }
         rule.activityRule.scenario.recreate()
@@ -226,7 +226,7 @@ class TaskFeaturesTest {
         allowNotifications()
         add("Recordar estudiar"); recordTask("Recordar estudiar")
         rule.onNodeWithText("Recordar estudiar").performClick()
-        rule.onNodeWithText("Recordatorio").performClick()
+        rule.onNodeWithText("Recordatorio").performScrollTo().performClick()
         rule.onNodeWithText("Fecha").performClick()
         rule.onNodeWithText("Aceptar fecha").performClick()
         rule.onNodeWithText("Hora").performClick()
@@ -239,7 +239,7 @@ class TaskFeaturesTest {
         rule.activityRule.scenario.recreate()
         rule.waitUntil(5000) { rule.onAllNodesWithText("Recordatorio activo").fetchSemanticsNodes().isNotEmpty() }
         rule.onNodeWithText("Recordar estudiar").performClick()
-        rule.onNodeWithText("Recordatorio").performClick()
+        rule.onNodeWithText("Recordatorio").performScrollTo().performClick()
         rule.onNodeWithText("Quitar recordatorio").performClick()
         rule.waitUntil(5000) { runBlocking { TaskDatabase.getInstance(context).taskDao().getTask(task.id)?.reminderAt == null } }
         rule.waitUntil(5000) { WorkManager.getInstance(context).getWorkInfosForUniqueWork("task-reminder-${task.id}")
@@ -258,7 +258,7 @@ class TaskFeaturesTest {
             .filter { it.id in created }.all { it.reminderAt != null } } }
         rule.onNodeWithContentDescription("Completar Aviso pendiente cancelado").performClick()
         rule.onNodeWithText("Aviso eliminado").performClick()
-        rule.onNodeWithText("Eliminar tarea").performClick()
+        rule.onNodeWithText("Eliminar tarea").performScrollTo().performClick()
         rule.onNodeWithText("Eliminar").performClick()
         rule.waitUntil(5000) { saved.all { task -> WorkManager.getInstance(context)
             .getWorkInfosForUniqueWork("task-reminder-${task.id}").get().all { it.state == WorkInfo.State.CANCELLED } } }
@@ -298,7 +298,7 @@ class TaskFeaturesTest {
         recordTask("Tarea prioritaria")
         rule.onNodeWithText("Prioridad Alta").assertExists()
         rule.onNodeWithText("Tarea prioritaria").performClick()
-        rule.onNodeWithText("Baja").performClick()
+        rule.onNodeWithText("Baja").performScrollTo().performClick()
         rule.onNodeWithText("Guardar cambios").performClick()
         rule.waitUntil(5000) { rule.onAllNodesWithText("Prioridad Baja").fetchSemanticsNodes().isNotEmpty() }
         rule.activityRule.scenario.recreate()
@@ -309,7 +309,7 @@ class TaskFeaturesTest {
         add("Ejercicio recurrente"); recordTask("Ejercicio recurrente")
         fun set(label: String) {
             rule.onNodeWithText("Ejercicio recurrente").performClick()
-            rule.onNodeWithText("Repetición").performClick()
+            rule.onNodeWithText("Repetición").performScrollTo().performClick()
             rule.onNodeWithText(label).performClick()
             rule.onNodeWithText("Guardar repetición").performClick()
             rule.waitUntil(5000) { rule.onAllNodesWithText("Repetición $label").fetchSemanticsNodes().isNotEmpty() }
@@ -324,7 +324,7 @@ class TaskFeaturesTest {
         assertEquals("Semanal", weekly.repeat)
         assertTrue(weekly.nextRepeatAt!! > daily.nextRepeatAt!!)
         rule.onNodeWithText("Ejercicio recurrente").performClick()
-        rule.onNodeWithText("Repetición").performClick()
+        rule.onNodeWithText("Repetición").performScrollTo().performClick()
         rule.onNodeWithText("Ninguna").performClick()
         rule.onNodeWithText("Guardar repetición").performClick()
         rule.waitUntil(5000) { runBlocking { TaskDatabase.getInstance(context).taskDao().getTask(daily.id)?.nextRepeatAt == null } }
@@ -352,10 +352,48 @@ class TaskFeaturesTest {
             .get().let { infos -> infos.any { it.state == WorkInfo.State.SUCCEEDED } &&
                 infos.any { it.state == WorkInfo.State.ENQUEUED || it.state == WorkInfo.State.BLOCKED } } }
         rule.onNodeWithText("Ciclo automático").performClick()
-        rule.onNodeWithText("Eliminar tarea").performClick()
+        rule.onNodeWithText("Eliminar tarea").performScrollTo().performClick()
         rule.onNodeWithText("Eliminar").performClick()
         rule.waitUntil(5000) { WorkManager.getInstance(context).getWorkInfosForUniqueWork("task-repeat-${original.id}")
             .get().all { it.state.isFinished } }
+    }
+    @Test fun categoriesPersistAndCombineWithFiltersAndSearch() {
+        rule.onNodeWithContentDescription("Agregar tarea").performClick()
+        rule.onNodeWithTag("newTaskTitle").performTextReplacement("Leer apuntes")
+        rule.onNodeWithContentDescription("Agregar detalles").performClick()
+        rule.onNodeWithTag("newTaskCategory").performTextReplacement("Estudios")
+        rule.onNodeWithText("Guardar").performClick()
+        rule.waitUntil(5000) { rule.onAllNodesWithText("Leer apuntes").fetchSemanticsNodes().isNotEmpty() }
+        recordTask("Leer apuntes")
+        add("Lavar platos"); recordTask("Lavar platos")
+        rule.onNodeWithText("Lavar platos").performClick()
+        rule.onNodeWithContentDescription("Elegir categoría").performClick()
+        rule.onNodeWithContentDescription("Asignar categoría Personal").performClick()
+        rule.onNodeWithText("Guardar cambios").performClick()
+        rule.activityRule.scenario.recreate()
+        rule.waitUntil(5000) { rule.onAllNodesWithText("Leer apuntes").fetchSemanticsNodes().isNotEmpty() }
+        rule.onNodeWithContentDescription("Filtrar por categoría").performClick()
+        rule.onNodeWithContentDescription("Filtrar categoría Estudios").performClick()
+        rule.onNodeWithText("Leer apuntes").assertExists()
+        rule.onNodeWithText("Lavar platos").assertDoesNotExist()
+        rule.onNodeWithTag("search").performTextReplacement("Leer")
+        rule.onNodeWithText("Pendientes").performClick()
+        rule.onNodeWithText("Leer apuntes").assertExists()
+        rule.onNodeWithText("Completadas").performClick()
+        rule.onNodeWithText("Leer apuntes").assertDoesNotExist()
+        rule.onNodeWithText("Todas").performClick()
+        rule.onNodeWithText("Limpiar").performClick()
+        rule.onNodeWithText("Quitar filtro").performClick()
+        rule.onNodeWithText("Lavar platos").performClick()
+        rule.onNodeWithTag("editCategory").performTextReplacement("Casa")
+        rule.onNodeWithText("Guardar cambios").performClick()
+        rule.waitUntil(5000) { rule.onAllNodesWithText("Categoría: Casa").fetchSemanticsNodes().isNotEmpty() }
+        rule.onNodeWithContentDescription("Filtrar por categoría").performClick()
+        rule.onNodeWithContentDescription("Filtrar categoría Casa").performClick()
+        rule.onNodeWithText("Lavar platos").assertExists()
+        rule.onNodeWithText("Leer apuntes").assertDoesNotExist()
+        runBlocking { assertEquals("Casa", TaskDatabase.getInstance(context).taskDao().getAllTasks()
+            .single { it.description == "Lavar platos" }.category) }
     }
     @Test fun migrationPreservesExistingTasks() {
         val name = "migration-design-test.db"
@@ -366,12 +404,12 @@ class TaskFeaturesTest {
             db.version = 1
         }
         val migrated = Room.databaseBuilder(context, TaskDatabase::class.java, name)
-            .addMigrations(TaskDatabase.MIGRATION_1_2, TaskDatabase.MIGRATION_2_3, TaskDatabase.MIGRATION_3_4, TaskDatabase.MIGRATION_4_5, TaskDatabase.MIGRATION_5_6, TaskDatabase.MIGRATION_6_7).build()
+            .addMigrations(TaskDatabase.MIGRATION_1_2, TaskDatabase.MIGRATION_2_3, TaskDatabase.MIGRATION_3_4, TaskDatabase.MIGRATION_4_5, TaskDatabase.MIGRATION_5_6, TaskDatabase.MIGRATION_6_7, TaskDatabase.MIGRATION_7_8).build()
         runBlocking {
             val task = migrated.taskDao().getAllTasks().single()
             assertEquals(7, task.id); assertEquals("Tarea anterior", task.description)
             assertTrue(task.isCompleted); assertFalse(task.isStarred)
-            assertEquals("Mis tareas", task.listName); assertEquals("", task.notes); assertNull(task.dueAt); assertNull(task.createdAt); assertNull(task.reminderAt); assertNull(task.remindedAt); assertEquals("Media", task.priority); assertEquals("Ninguna", task.repeat); assertNull(task.nextRepeatAt)
+            assertEquals("Mis tareas", task.listName); assertEquals("", task.notes); assertNull(task.dueAt); assertNull(task.createdAt); assertNull(task.reminderAt); assertNull(task.remindedAt); assertEquals("Media", task.priority); assertEquals("Ninguna", task.repeat); assertNull(task.nextRepeatAt); assertEquals("", task.category)
             assertTrue(migrated.taskDao().getLists().any { it.name == "Mis tareas" })
         }
         migrated.close()

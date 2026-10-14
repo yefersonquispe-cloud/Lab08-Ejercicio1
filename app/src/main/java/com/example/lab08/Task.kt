@@ -20,5 +20,6 @@ data class Task(
     @ColumnInfo(defaultValue = "'Media'") val priority: String = "Media",
     @ColumnInfo(defaultValue = "'Ninguna'") val repeat: String = "Ninguna",
     @ColumnInfo(name = "next_repeat_at") val nextRepeatAt: Long? = null,
-    @ColumnInfo(name = "repeat_zone", defaultValue = "'UTC'") val repeatZone: String = java.util.TimeZone.getDefault().id
+    @ColumnInfo(name = "repeat_zone", defaultValue = "'UTC'") val repeatZone: String = java.util.TimeZone.getDefault().id,
+    @ColumnInfo(defaultValue = "''") val category: String = ""
 )

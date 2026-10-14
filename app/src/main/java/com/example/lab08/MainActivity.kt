@@ -5,6 +5,8 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.SystemBarStyle
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.ui.focus.FocusRequester
@@ -75,6 +77,7 @@ fun TaskScreen(viewModel: TaskViewModel, initialList: String = "Mis tareas") {
     var addingTask by rememberSaveable { mutableStateOf(false) }
     var newTaskDescription by rememberSaveable { mutableStateOf("") }
     var newTaskNotes by rememberSaveable { mutableStateOf("") }
+    var newTaskCategory by rememberSaveable { mutableStateOf("") }
     var newTaskPriority by rememberSaveable { mutableStateOf("Media") }
     var newTaskStar by rememberSaveable { mutableStateOf(false) }
     var newTaskDueAt by rememberSaveable { mutableStateOf<Long?>(null) }
@@ -95,9 +98,12 @@ fun TaskScreen(viewModel: TaskViewModel, initialList: String = "Mis tareas") {
     var confirmClear by remember { mutableStateOf(false) }
     var filter by rememberSaveable { mutableStateOf(TaskFilter.ALL) }
     var search by rememberSaveable { mutableStateOf("") }
+    var categoryFilter by rememberSaveable { mutableStateOf<String?>(null) }
+    var showCategories by remember { mutableStateOf(false) }
+    val categories = (defaultCategories + tasks.map { it.category }.filter { it.isNotBlank() }).distinct()
     var sort by rememberSaveable { mutableStateOf(TaskSort.CREATED) }
     var showSort by remember { mutableStateOf(false) }
-    val visibleTasks = sortTasks(filterTasks(tasks, selectedList, favorites, filter, search), sort)
+    val visibleTasks = sortTasks(filterTasks(tasks, selectedList, favorites, filter, search, categoryFilter), sort)
     val listTitle = if (favorites) "Destacadas" else selectedList
     Scaffold(containerColor = MaterialTheme.colorScheme.background,
         floatingActionButton = {
@@ -135,6 +141,12 @@ fun TaskScreen(viewModel: TaskViewModel, initialList: String = "Mis tareas") {
                     FilterChip(selected = filter == option, onClick = { filter = option }, label = { Text(option.label) })
                 }
             }
+            categoryFilter?.let { category ->
+                Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Text("Categoría: ${category.ifBlank { "Sin categoría" }}", Modifier.weight(1f), fontSize = 13.sp)
+                    TextButton(onClick = { categoryFilter = null }) { Text("Quitar filtro") }
+                }
+            }
             LazyColumn(Modifier.fillMaxWidth().weight(1f).testTag("taskList"),
                 contentPadding = PaddingValues(start = 8.dp, end = 8.dp, top = 8.dp, bottom = 92.dp)) {
                 item {
@@ -144,6 +156,19 @@ fun TaskScreen(viewModel: TaskViewModel, initialList: String = "Mis tareas") {
                         Row(Modifier.fillMaxWidth().height(66.dp).padding(start = 24.dp, end = 10.dp),
                             verticalAlignment = Alignment.CenterVertically) {
                             Text(listTitle, Modifier.weight(1f), fontWeight = FontWeight.SemiBold, fontSize = 16.sp)
+                            Box {
+                                TextButton(onClick = { showCategories = true }, modifier = Modifier.semantics {
+                                    contentDescription = "Filtrar por categoría"
+                                }) { Text("Categorías") }
+                                DropdownMenu(expanded = showCategories, onDismissRequest = { showCategories = false }) {
+                                    DropdownMenuItem(text = { Text("Todas las categorías") }, onClick = { categoryFilter = null; showCategories = false })
+                                    DropdownMenuItem(text = { Text("Sin categoría") }, onClick = { categoryFilter = ""; showCategories = false })
+                                    categories.forEach { name ->
+                                        DropdownMenuItem(modifier = Modifier.semantics { contentDescription = "Filtrar categoría $name" },
+                                            text = { Text(name) }, onClick = { categoryFilter = name; showCategories = false })
+                                    }
+                                }
+                            }
                             Box {
                                 IconButton(onClick = { showSort = true }, modifier = Modifier.semantics {
                                     contentDescription = "Ordenar tareas"
@@ -176,7 +201,7 @@ fun TaskScreen(viewModel: TaskViewModel, initialList: String = "Mis tareas") {
                             EmptyTasksIllustration(Modifier.fillMaxWidth().height(180.dp))
                             Spacer(Modifier.height(28.dp))
                             Text(if (search.isNotBlank()) "Sin resultados"
-                                else if (filter != TaskFilter.ALL) "No hay tareas para este filtro"
+                                else if (filter != TaskFilter.ALL || categoryFilter != null) "No hay tareas para este filtro"
                                 else if (favorites) "No hay tareas destacadas" else "No hay tareas aún",
                                 fontSize = 21.sp, textAlign = TextAlign.Center)
                             Spacer(Modifier.height(12.dp))
@@ -201,6 +226,8 @@ fun TaskScreen(viewModel: TaskViewModel, initialList: String = "Mis tareas") {
                                 Text("Prioridad ${task.priority}", fontSize = 12.sp,
                                     modifier = Modifier.testTag("priority_${task.id}"), color = priorityColor(task.priority))
                                 if (task.notes.isNotBlank()) Text(task.notes, fontSize = 13.sp,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                if (task.category.isNotBlank()) Text("Categoría: ${task.category}", fontSize = 12.sp,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant)
                                 if (task.repeat != "Ninguna") Text("Repetición ${task.repeat}", fontSize = 12.sp,
                                     color = MaterialTheme.colorScheme.primary)
@@ -244,6 +271,7 @@ fun TaskScreen(viewModel: TaskViewModel, initialList: String = "Mis tareas") {
                         if (newTaskNotes.isEmpty()) Text("Agregar detalles", color = MaterialTheme.colorScheme.onSurfaceVariant)
                         field()
                     })
+                if (showNotes) TaskCategoryField(newTaskCategory, categories, "newTaskCategory") { newTaskCategory = it }
                 PrioritySelector(newTaskPriority) { newTaskPriority = it }
                 newTaskDueAt?.let { TextButton(onClick = { choosingDate = true }) {
                     Text(DateFormat.getDateTimeInstance(DateFormat.SHORT, DateFormat.SHORT).format(it))
@@ -262,9 +290,9 @@ fun TaskScreen(viewModel: TaskViewModel, initialList: String = "Mis tareas") {
                         color = if (newTaskStar) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant) }
                     Spacer(Modifier.weight(1f))
                     TextButton(onClick = {
-                        viewModel.addTask(newTaskDescription, selectedList, newTaskNotes, newTaskDueAt, newTaskStar, newTaskPriority)
+                        viewModel.addTask(newTaskDescription, selectedList, newTaskNotes, newTaskDueAt, newTaskStar, newTaskPriority, newTaskCategory)
                         newTaskDescription = ""; newTaskNotes = ""; newTaskDueAt = null
-                        newTaskStar = false; newTaskPriority = "Media"; showNotes = false; addingTask = false; favorites = false
+                        newTaskStar = false; newTaskPriority = "Media"; newTaskCategory = ""; showNotes = false; addingTask = false; favorites = false
                     }, enabled = newTaskDescription.isNotBlank()) { Text("Guardar") }
                 }
             }
@@ -292,14 +320,17 @@ fun TaskScreen(viewModel: TaskViewModel, initialList: String = "Mis tareas") {
         }) { Text("Aceptar") } }, dismissButton = { TextButton(onClick = { choosingTime = false }) { Text("Cancelar") } })
     editingTask?.let { task ->
         var title by remember(task.id) { mutableStateOf(task.description) }
+        var category by remember(task.id) { mutableStateOf(task.category) }
         var priority by remember(task.id) { mutableStateOf(task.priority) }
         var notes by remember(task.id) { mutableStateOf(task.notes) }
         AlertDialog(onDismissRequest = { editingTask = null }, title = { Text("Editar tarea") },
-            text = { Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            text = { Column(Modifier.heightIn(max = 440.dp).verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 OutlinedTextField(value = title, onValueChange = { title = it }, label = { Text("Nombre") },
                     modifier = Modifier.testTag("editTitle"))
                 OutlinedTextField(value = notes, onValueChange = { notes = it }, label = { Text("Descripción") },
                     modifier = Modifier.testTag("editNotes"))
+                TaskCategoryField(category, categories, "editCategory") { category = it }
                 PrioritySelector(priority) { priority = it }
                 TextButton(onClick = { repeatTask = task; editingTask = null }) { Text("Repetición") }
                 TextButton(enabled = !task.isCompleted, onClick = { reminderTask = task; editingTask = null }) {
@@ -309,7 +340,7 @@ fun TaskScreen(viewModel: TaskViewModel, initialList: String = "Mis tareas") {
                     Text("Eliminar tarea", color = MaterialTheme.colorScheme.error)
                 }
             } }, confirmButton = { TextButton(enabled = title.isNotBlank(), onClick = {
-                viewModel.editTask(task, title, notes, priority); editingTask = null
+                viewModel.editTask(task, title, notes, priority, category); editingTask = null
             }) { Text("Guardar cambios") } },
             dismissButton = { TextButton(onClick = { editingTask = null }) { Text("Cancelar") } })
     }
