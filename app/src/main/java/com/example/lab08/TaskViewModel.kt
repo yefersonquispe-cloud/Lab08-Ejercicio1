@@ -6,7 +6,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 
-class TaskViewModel(private val dao: TaskDao, private val reminders: TaskReminderScheduler) : ViewModel() {
+class TaskViewModel(private val dao: TaskDao, private val reminders: TaskReminderScheduler, private val repeats: TaskRecurrenceScheduler) : ViewModel() {
 
     // Estado para la lista de tareas
     private val _tasks = MutableStateFlow<List<Task>>(emptyList())
@@ -35,7 +35,10 @@ class TaskViewModel(private val dao: TaskDao, private val reminders: TaskReminde
         viewModelScope.launch {
             dao.insertList(TaskList("Mis tareas"))
             _lists.value = dao.getLists()
-            dao.getAllTasks().forEach { reminders.sync(it, replace = false) }
+            dao.getAllTasks().forEach {
+                reminders.sync(it, replace = false)
+                repeats.sync(it, androidx.work.ExistingWorkPolicy.KEEP)
+            }
         }
     }
 
@@ -63,6 +66,7 @@ class TaskViewModel(private val dao: TaskDao, private val reminders: TaskReminde
         viewModelScope.launch {
             dao.deleteTask(task)
             reminders.cancel(task.id)
+            repeats.cancel(task.id)
         }
     }
 
@@ -78,7 +82,21 @@ class TaskViewModel(private val dao: TaskDao, private val reminders: TaskReminde
         if (date != null && date <= System.currentTimeMillis()) return
         viewModelScope.launch {
             dao.setReminderDate(task.id, date)
-            dao.getTask(task.id)?.let { reminders.sync(it) }
+            dao.getTask(task.id)?.let {
+                reminders.sync(it)
+                if (date != null && TaskRepeat.from(it.repeat) != TaskRepeat.NONE) setRepeat(it, TaskRepeat.from(it.repeat))
+            }
+        }
+    }
+
+    fun setRepeat(task: Task, repeat: TaskRepeat) {
+        viewModelScope.launch {
+            val current = dao.getTask(task.id) ?: return@launch
+            val now = System.currentTimeMillis()
+            val zone = java.util.TimeZone.getDefault().id
+            val next = nextRepeatDate(current.dueAt ?: now, repeat, now, zone)
+            dao.setRepeat(task.id, repeat.label, next, zone)
+            dao.getTask(task.id)?.let { repeats.sync(it) }
         }
     }
 
@@ -87,7 +105,7 @@ class TaskViewModel(private val dao: TaskDao, private val reminders: TaskReminde
         viewModelScope.launch {
             val old = dao.getAllTasks()
             dao.deleteAllTasks()
-            old.forEach { reminders.cancel(it.id) }
+            old.forEach { reminders.cancel(it.id); repeats.cancel(it.id) }
         }
     }
 }

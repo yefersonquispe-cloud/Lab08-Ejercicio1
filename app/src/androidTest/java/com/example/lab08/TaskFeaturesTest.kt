@@ -29,6 +29,7 @@ class TaskFeaturesTest {
         for (task in db.taskDao().getAllTasks()) {
             if (created[task.id] == task.description) {
                 TaskReminderScheduler(context).cancel(task.id)
+                TaskRecurrenceScheduler(context).cancel(task.id)
                 db.openHelper.writableDatabase.execSQL("DELETE FROM tasks WHERE id = ?", arrayOf(task.id))
             }
         }
@@ -304,6 +305,58 @@ class TaskFeaturesTest {
         rule.waitUntil(5000) { rule.onAllNodesWithText("Prioridad Baja").fetchSemanticsNodes().isNotEmpty() }
         assertEquals("Baja", runBlocking { TaskDatabase.getInstance(context).taskDao().getAllTasks().single { it.id in created }.priority })
     }
+    @Test fun dailyAndWeeklyRepeatSettingsPersist() {
+        add("Ejercicio recurrente"); recordTask("Ejercicio recurrente")
+        fun set(label: String) {
+            rule.onNodeWithText("Ejercicio recurrente").performClick()
+            rule.onNodeWithText("Repetición").performClick()
+            rule.onNodeWithText(label).performClick()
+            rule.onNodeWithText("Guardar repetición").performClick()
+            rule.waitUntil(5000) { rule.onAllNodesWithText("Repetición $label").fetchSemanticsNodes().isNotEmpty() }
+        }
+        set("Diaria")
+        val daily = runBlocking { TaskDatabase.getInstance(context).taskDao().getAllTasks().single { it.id in created } }
+        assertTrue(daily.nextRepeatAt!! > System.currentTimeMillis())
+        set("Semanal")
+        rule.activityRule.scenario.recreate()
+        rule.waitUntil(5000) { rule.onAllNodesWithText("Repetición Semanal").fetchSemanticsNodes().isNotEmpty() }
+        val weekly = runBlocking { TaskDatabase.getInstance(context).taskDao().getTask(daily.id)!! }
+        assertEquals("Semanal", weekly.repeat)
+        assertTrue(weekly.nextRepeatAt!! > daily.nextRepeatAt!!)
+        rule.onNodeWithText("Ejercicio recurrente").performClick()
+        rule.onNodeWithText("Repetición").performClick()
+        rule.onNodeWithText("Ninguna").performClick()
+        rule.onNodeWithText("Guardar repetición").performClick()
+        rule.waitUntil(5000) { runBlocking { TaskDatabase.getInstance(context).taskDao().getTask(daily.id)?.nextRepeatAt == null } }
+    }
+    @Test fun realWorkerRestartsCompletedRecurringTask() {
+        add("Ciclo automático"); recordTask("Ciclo automático")
+        val dao = TaskDatabase.getInstance(context).taskDao()
+        val original = runBlocking { dao.getAllTasks().single { it.id in created } }
+        rule.onNodeWithContentDescription("Completar Ciclo automático").performClick()
+        val trigger = System.currentTimeMillis() + 2000
+        // Acorta solamente la primera fecha de esta tarea de prueba; el siguiente intervalo sigue siendo diario.
+        runBlocking { dao.setRepeat(original.id, "Diaria", trigger, "America/Lima") }
+        TaskRecurrenceScheduler(context).sync(runBlocking { dao.getTask(original.id)!! })
+        rule.waitUntil(30000) { runBlocking { dao.getTask(original.id)?.nextRepeatAt?.let { it > trigger } == true } }
+        val restarted = runBlocking { dao.getTask(original.id)!! }
+        assertFalse(restarted.isCompleted); assertEquals(trigger, restarted.dueAt)
+        assertEquals(original.createdAt, restarted.createdAt)
+        val expected = Calendar.getInstance(java.util.TimeZone.getTimeZone("America/Lima")).apply {
+            timeInMillis = trigger; add(Calendar.DAY_OF_MONTH, 1)
+        }.timeInMillis
+        assertEquals(expected, restarted.nextRepeatAt)
+        assertEquals(1, runBlocking { dao.getAllTasks().count { it.id == original.id } })
+        rule.onNodeWithContentDescription("Completar Ciclo automático").assertIsOff()
+        rule.waitUntil(5000) { WorkManager.getInstance(context).getWorkInfosForUniqueWork("task-repeat-${original.id}")
+            .get().let { infos -> infos.any { it.state == WorkInfo.State.SUCCEEDED } &&
+                infos.any { it.state == WorkInfo.State.ENQUEUED || it.state == WorkInfo.State.BLOCKED } } }
+        rule.onNodeWithText("Ciclo automático").performClick()
+        rule.onNodeWithText("Eliminar tarea").performClick()
+        rule.onNodeWithText("Eliminar").performClick()
+        rule.waitUntil(5000) { WorkManager.getInstance(context).getWorkInfosForUniqueWork("task-repeat-${original.id}")
+            .get().all { it.state.isFinished } }
+    }
     @Test fun migrationPreservesExistingTasks() {
         val name = "migration-design-test.db"
         context.deleteDatabase(name)
@@ -313,12 +366,12 @@ class TaskFeaturesTest {
             db.version = 1
         }
         val migrated = Room.databaseBuilder(context, TaskDatabase::class.java, name)
-            .addMigrations(TaskDatabase.MIGRATION_1_2, TaskDatabase.MIGRATION_2_3, TaskDatabase.MIGRATION_3_4, TaskDatabase.MIGRATION_4_5, TaskDatabase.MIGRATION_5_6).build()
+            .addMigrations(TaskDatabase.MIGRATION_1_2, TaskDatabase.MIGRATION_2_3, TaskDatabase.MIGRATION_3_4, TaskDatabase.MIGRATION_4_5, TaskDatabase.MIGRATION_5_6, TaskDatabase.MIGRATION_6_7).build()
         runBlocking {
             val task = migrated.taskDao().getAllTasks().single()
             assertEquals(7, task.id); assertEquals("Tarea anterior", task.description)
             assertTrue(task.isCompleted); assertFalse(task.isStarred)
-            assertEquals("Mis tareas", task.listName); assertEquals("", task.notes); assertNull(task.dueAt); assertNull(task.createdAt); assertNull(task.reminderAt); assertNull(task.remindedAt); assertEquals("Media", task.priority)
+            assertEquals("Mis tareas", task.listName); assertEquals("", task.notes); assertNull(task.dueAt); assertNull(task.createdAt); assertNull(task.reminderAt); assertNull(task.remindedAt); assertEquals("Media", task.priority); assertEquals("Ninguna", task.repeat); assertNull(task.nextRepeatAt)
             assertTrue(migrated.taskDao().getLists().any { it.name == "Mis tareas" })
         }
         migrated.close()

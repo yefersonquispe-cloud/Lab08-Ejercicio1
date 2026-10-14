@@ -59,7 +59,7 @@ class MainActivity : ComponentActivity() {
         val db = TaskDatabase.getInstance(applicationContext)
         val model = ViewModelProvider(this, object : ViewModelProvider.Factory {
             @Suppress("UNCHECKED_CAST")
-            override fun <T : ViewModel> create(modelClass: Class<T>): T = TaskViewModel(db.taskDao(), TaskReminderScheduler(applicationContext)) as T
+            override fun <T : ViewModel> create(modelClass: Class<T>): T = TaskViewModel(db.taskDao(), TaskReminderScheduler(applicationContext), TaskRecurrenceScheduler(applicationContext)) as T
         })[TaskViewModel::class.java]
         setContent { Lab08Theme(darkTheme = true, dynamicColor = false) { TaskScreen(model, intent.getStringExtra("list_name") ?: "Mis tareas") } }
     }
@@ -89,6 +89,7 @@ fun TaskScreen(viewModel: TaskViewModel, initialList: String = "Mis tareas") {
     var newListName by rememberSaveable { mutableStateOf("") }
     var showMenu by remember { mutableStateOf(false) }
     var taskToDelete by remember { mutableStateOf<Task?>(null) }
+    var repeatTask by remember { mutableStateOf<Task?>(null) }
     var reminderTask by remember { mutableStateOf<Task?>(null) }
     var editingTask by remember { mutableStateOf<Task?>(null) }
     var confirmClear by remember { mutableStateOf(false) }
@@ -201,6 +202,8 @@ fun TaskScreen(viewModel: TaskViewModel, initialList: String = "Mis tareas") {
                                     modifier = Modifier.testTag("priority_${task.id}"), color = priorityColor(task.priority))
                                 if (task.notes.isNotBlank()) Text(task.notes, fontSize = 13.sp,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                if (task.repeat != "Ninguna") Text("Repetición ${task.repeat}", fontSize = 12.sp,
+                                    color = MaterialTheme.colorScheme.primary)
                                 if (task.reminderAt != null) Text(if (task.remindedAt == null) "Recordatorio activo" else "Recordatorio enviado",
                                     fontSize = 12.sp, color = MaterialTheme.colorScheme.primary)
                                 task.dueAt?.let { Text(DateFormat.getDateTimeInstance(DateFormat.SHORT, DateFormat.SHORT).format(it),
@@ -298,6 +301,7 @@ fun TaskScreen(viewModel: TaskViewModel, initialList: String = "Mis tareas") {
                 OutlinedTextField(value = notes, onValueChange = { notes = it }, label = { Text("Descripción") },
                     modifier = Modifier.testTag("editNotes"))
                 PrioritySelector(priority) { priority = it }
+                TextButton(onClick = { repeatTask = task; editingTask = null }) { Text("Repetición") }
                 TextButton(enabled = !task.isCompleted, onClick = { reminderTask = task; editingTask = null }) {
                     Text("Recordatorio")
                 }
@@ -308,6 +312,11 @@ fun TaskScreen(viewModel: TaskViewModel, initialList: String = "Mis tareas") {
                 viewModel.editTask(task, title, notes, priority); editingTask = null
             }) { Text("Guardar cambios") } },
             dismissButton = { TextButton(onClick = { editingTask = null }) { Text("Cancelar") } })
+    }
+    repeatTask?.let { task ->
+        TaskRepeatDialog(task, onDismiss = { repeatTask = null }, onSave = { repeat ->
+            viewModel.setRepeat(task, repeat); repeatTask = null
+        })
     }
     reminderTask?.let { task ->
         TaskReminderDialog(task, onDismiss = { reminderTask = null }, onSave = { date ->

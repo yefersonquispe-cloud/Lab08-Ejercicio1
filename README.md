@@ -15,6 +15,8 @@ Se conservan las funciones de crear tareas, marcar completadas, destacar tareas 
 
 7. **Prioridades:** selecciona Alta, Media o Baja al crear o editar la tarea. El valor se conserva y aparece con un color y texto en la lista.
 
+8. **Repetición:** abre una tarea → «Repetición» → Ninguna, Diaria o Semanal. Al llegar el siguiente intervalo, la misma tarea vuelve a estar pendiente y se actualiza su fecha. No se duplican filas ni se cambia la fecha de creación. Se mantiene la hora local de la serie y se omiten ciclos atrasados. Si tiene recordatorio, se programa también para el nuevo ciclo. Eliminar la tarea o elegir Ninguna detiene la repetición; marcarla completada solo completa el ciclo actual.
+
 ## Recordatorios y permisos
 
 En Android 13 o superior se solicita `POST_NOTIFICATIONS` al guardar el primer recordatorio. Si se deniega, el diálogo permite abrir los ajustes. El permiso y el canal «Recordatorios de tareas» deben estar habilitados.
@@ -32,7 +34,7 @@ Abre la carpeta del proyecto en Android Studio y sincroniza Gradle. Usa el JDK i
 ./gradlew assembleDebug
 ```
 
-Room incluye migraciones 1 → 2 → 3 → 4 → 5 → 6 y esquemas versionados. No se borra la base de datos para actualizarla.
+Room incluye migraciones 1 → 2 → 3 → 4 → 5 → 6 → 7 y esquemas versionados. No se borra la base de datos para actualizarla.
 
 ## Pruebas
 

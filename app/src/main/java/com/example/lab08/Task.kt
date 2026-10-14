@@ -17,5 +17,8 @@ data class Task(
     @ColumnInfo(name = "created_at") val createdAt: Long? = System.currentTimeMillis(),
     @ColumnInfo(name = "reminder_at") val reminderAt: Long? = null,
     @ColumnInfo(name = "reminded_at") val remindedAt: Long? = null,
-    @ColumnInfo(defaultValue = "'Media'") val priority: String = "Media"
+    @ColumnInfo(defaultValue = "'Media'") val priority: String = "Media",
+    @ColumnInfo(defaultValue = "'Ninguna'") val repeat: String = "Ninguna",
+    @ColumnInfo(name = "next_repeat_at") val nextRepeatAt: Long? = null,
+    @ColumnInfo(name = "repeat_zone", defaultValue = "'UTC'") val repeatZone: String = java.util.TimeZone.getDefault().id
 )

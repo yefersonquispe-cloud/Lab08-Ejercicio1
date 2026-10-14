@@ -41,6 +41,12 @@ interface TaskDao {
     @Query("UPDATE tasks SET reminder_at = :date, reminded_at = NULL, due_at = CASE WHEN :date IS NULL THEN due_at ELSE :date END WHERE id = :id")
     suspend fun setReminderDate(id: Int, date: Long?)
 
+    @Query("UPDATE tasks SET repeat = :repeat, next_repeat_at = :next, repeat_zone = :zone WHERE id = :id")
+    suspend fun setRepeat(id: Int, repeat: String, next: Long?, zone: String)
+
+    @Query("UPDATE tasks SET is_completed = 0, due_at = :expected, next_repeat_at = :next, reminded_at = NULL, reminder_at = CASE WHEN reminder_at IS NULL THEN NULL ELSE :expected END WHERE id = :id AND next_repeat_at = :expected AND repeat != 'Ninguna'")
+    suspend fun advanceRepeat(id: Int, expected: Long, next: Long)
+
     // Insertar una nueva tarea
     @Insert
     suspend fun insertTask(task: Task): Long
