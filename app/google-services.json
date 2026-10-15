@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "903575342294",
+    "project_id": "lab08-ejercicio1",
+    "storage_bucket": "lab08-ejercicio1.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:903575342294:android:bf6399fa14e184da2ccd77",
+        "android_client_info": {
+          "package_name": "com.example.lab08"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBNbclJPp4ibgTmCp9gJmIESBnIZmUQMts"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
