@@ -7,8 +7,9 @@ import androidx.room.RoomDatabase
 import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 
-@Database(entities = [Task::class, TaskList::class], version = 8)
+@Database(entities = [Task::class, TaskList::class, TaskCloudState::class, CloudDeletion::class, CloudControl::class], version = 9)
 abstract class TaskDatabase : RoomDatabase() {
+    abstract fun cloudDao(): CloudDao
     abstract fun taskDao(): TaskDao
 
     companion object {
@@ -55,9 +56,29 @@ abstract class TaskDatabase : RoomDatabase() {
                 db.execSQL("ALTER TABLE tasks ADD COLUMN category TEXT NOT NULL DEFAULT ''")
             }
         }
+        val MIGRATION_8_9 = object : Migration(8, 9) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("CREATE TABLE IF NOT EXISTS task_cloud_state (localId INTEGER NOT NULL PRIMARY KEY, remoteId TEXT NOT NULL, ownerUid TEXT NOT NULL DEFAULT '', revision INTEGER NOT NULL DEFAULT 1, changedAt INTEGER NOT NULL DEFAULT 0, dirty INTEGER NOT NULL DEFAULT 1)")
+                db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS index_task_cloud_state_remoteId ON task_cloud_state(remoteId)")
+                db.execSQL("CREATE TABLE IF NOT EXISTS cloud_deletions (remoteId TEXT NOT NULL PRIMARY KEY, ownerUid TEXT NOT NULL, changedAt INTEGER NOT NULL)")
+                db.execSQL("CREATE TABLE IF NOT EXISTS cloud_control (id INTEGER NOT NULL PRIMARY KEY, importing INTEGER NOT NULL)")
+                installCloudTracking(db)
+            }
+        }
+        val SYNC_CALLBACK = object : Callback() {
+            override fun onOpen(db: SupportSQLiteDatabase) { installCloudTracking(db) }
+        }
+        private fun installCloudTracking(db: SupportSQLiteDatabase) {
+            db.execSQL("INSERT OR IGNORE INTO cloud_control VALUES (1, 0)")
+            val clock = "CAST((julianday('now') - 2440587.5) * 86400000 AS INTEGER)"
+            db.execSQL("INSERT OR IGNORE INTO task_cloud_state(localId,remoteId,ownerUid,revision,changedAt,dirty) SELECT id,lower(hex(randomblob(16))),'',1,$clock,1 FROM tasks")
+            db.execSQL("CREATE TRIGGER IF NOT EXISTS cloud_task_insert AFTER INSERT ON tasks WHEN (SELECT importing FROM cloud_control WHERE id=1)=0 BEGIN INSERT INTO task_cloud_state(localId,remoteId,ownerUid,revision,changedAt,dirty) VALUES(NEW.id,lower(hex(randomblob(16))),'',1,$clock,1); END")
+            db.execSQL("CREATE TRIGGER IF NOT EXISTS cloud_task_update AFTER UPDATE ON tasks WHEN (SELECT importing FROM cloud_control WHERE id=1)=0 BEGIN UPDATE task_cloud_state SET revision=revision+1, changedAt=MAX(changedAt+1,$clock), dirty=1 WHERE localId=NEW.id; END")
+            db.execSQL("CREATE TRIGGER IF NOT EXISTS cloud_task_delete BEFORE DELETE ON tasks WHEN (SELECT importing FROM cloud_control WHERE id=1)=0 BEGIN INSERT OR REPLACE INTO cloud_deletions SELECT remoteId,ownerUid,MAX(changedAt+1,$clock) FROM task_cloud_state WHERE localId=OLD.id AND ownerUid!=''; DELETE FROM task_cloud_state WHERE localId=OLD.id; END")
+        }
         fun getInstance(context: Context): TaskDatabase = instance ?: synchronized(this) {
             instance ?: Room.databaseBuilder(context.applicationContext, TaskDatabase::class.java, "task_db")
-                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8).build().also { instance = it }
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9).addCallback(SYNC_CALLBACK).build().also { instance = it }
         }
     }
 }

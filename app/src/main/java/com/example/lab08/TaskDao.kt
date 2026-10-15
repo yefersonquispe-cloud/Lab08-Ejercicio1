@@ -13,6 +13,9 @@ interface TaskDao {
     @Query("SELECT * FROM task_lists ORDER BY CASE WHEN name = 'Mis tareas' THEN 0 ELSE 1 END, name")
     suspend fun getLists(): List<TaskList>
 
+    @Query("SELECT * FROM task_lists ORDER BY CASE WHEN name = 'Mis tareas' THEN 0 ELSE 1 END, name")
+    fun observeLists(): kotlinx.coroutines.flow.Flow<List<TaskList>>
+
     @Insert(onConflict = OnConflictStrategy.IGNORE)
     suspend fun insertList(list: TaskList)
 

@@ -61,7 +61,7 @@ class MainActivity : ComponentActivity() {
         val db = TaskDatabase.getInstance(applicationContext)
         val model = ViewModelProvider(this, object : ViewModelProvider.Factory {
             @Suppress("UNCHECKED_CAST")
-            override fun <T : ViewModel> create(modelClass: Class<T>): T = TaskViewModel(db.taskDao(), TaskReminderScheduler(applicationContext), TaskRecurrenceScheduler(applicationContext)) as T
+            override fun <T : ViewModel> create(modelClass: Class<T>): T = TaskViewModel(db.taskDao(), TaskReminderScheduler(applicationContext), TaskRecurrenceScheduler(applicationContext), CloudSync.get(applicationContext)) as T
         })[TaskViewModel::class.java]
         setContent { Lab08Theme(darkTheme = true, dynamicColor = false) { TaskScreen(model, intent.getStringExtra("list_name") ?: "Mis tareas") } }
     }
@@ -72,6 +72,8 @@ class MainActivity : ComponentActivity() {
 fun TaskScreen(viewModel: TaskViewModel, initialList: String = "Mis tareas") {
     val tasks by viewModel.tasks.collectAsState()
     val lists by viewModel.lists.collectAsState()
+    var showCloud by remember { mutableStateOf(false) }
+    val cloud = viewModel.cloud
     var selectedList by rememberSaveable { mutableStateOf(initialList) }
     var favorites by rememberSaveable { mutableStateOf(false) }
     var addingTask by rememberSaveable { mutableStateOf(false) }
@@ -118,6 +120,12 @@ fun TaskScreen(viewModel: TaskViewModel, initialList: String = "Mis tareas") {
                 Text("Tareas", Modifier.align(Alignment.Center), fontSize = 22.sp, fontWeight = FontWeight.Medium)
                 Box(Modifier.size(36.dp).align(Alignment.CenterEnd).clip(CircleShape).background(Color(0xFF8D7569)),
                     contentAlignment = Alignment.Center) { Text("Y", color = Color.White, fontSize = 20.sp) }
+            }
+            if (cloud != null) {
+                val account by cloud.session.collectAsState()
+                TextButton(onClick = { showCloud = true }, modifier = Modifier.fillMaxWidth().semantics {
+                    contentDescription = "Abrir sincronización en la nube"
+                }) { Text("☁  ${account.message}", fontSize = 12.sp) }
             }
             LazyRow(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically,
                 contentPadding = PaddingValues(horizontal = 12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -246,6 +254,7 @@ fun TaskScreen(viewModel: TaskViewModel, initialList: String = "Mis tareas") {
             }
         }
     }
+    if (showCloud && cloud != null) CloudAccountDialog(cloud, onDismiss = { showCloud = false })
     if (addingTask) {
         val focusRequester = remember { FocusRequester() }
         val keyboard = LocalSoftwareKeyboardController.current

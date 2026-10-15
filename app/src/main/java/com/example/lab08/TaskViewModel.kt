@@ -6,7 +6,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 
-class TaskViewModel(private val dao: TaskDao, private val reminders: TaskReminderScheduler, private val repeats: TaskRecurrenceScheduler) : ViewModel() {
+class TaskViewModel(private val dao: TaskDao, private val reminders: TaskReminderScheduler, private val repeats: TaskRecurrenceScheduler, val cloud: CloudSync? = null) : ViewModel() {
 
     // Estado para la lista de tareas
     private val _tasks = MutableStateFlow<List<Task>>(emptyList())
@@ -30,7 +30,8 @@ class TaskViewModel(private val dao: TaskDao, private val reminders: TaskReminde
     }
 
     init {
-        viewModelScope.launch { dao.observeTasks().collect { _tasks.value = it } }
+        viewModelScope.launch { (cloud?.visibleTasks ?: dao.observeTasks()).collect { _tasks.value = it } }
+        viewModelScope.launch { dao.observeLists().collect { _lists.value = it } }
         // Al inicializar, cargamos las listas y restauramos recordatorios aún pendientes.
         viewModelScope.launch {
             dao.insertList(TaskList("Mis tareas"))

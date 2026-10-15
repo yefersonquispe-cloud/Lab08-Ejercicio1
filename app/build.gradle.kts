@@ -46,6 +46,13 @@ val room_version = "2.7.2"
 
 dependencies {
 
+    implementation(platform("com.google.firebase:firebase-bom:34.4.0"))
+    implementation("com.google.firebase:firebase-auth")
+    implementation("com.google.firebase:firebase-firestore")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.10.2")
+    implementation("androidx.credentials:credentials:1.3.0")
+    implementation("androidx.credentials:credentials-play-services-auth:1.3.0")
+    implementation("com.google.android.libraries.identity.googleid:googleid:1.1.1")
     implementation("androidx.work:work-runtime-ktx:2.11.2")
     implementation("androidx.room:room-runtime:$room_version")
     ksp("androidx.room:room-compiler:$room_version")
@@ -69,3 +76,5 @@ dependencies {
 }
 // Esquemas versionados para comprobar migraciones sin perder datos.
 ksp { arg("room.schemaLocation", "$projectDir/schemas") }
+
+if (file("google-services.json").exists()) { apply(plugin = "com.google.gms.google-services") }
